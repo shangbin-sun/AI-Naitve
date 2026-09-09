@@ -4,10 +4,10 @@
 
 ## 目录
 
-- [`code/ai-project-factory`](code/ai-project-factory)：Python 后台、React 前端、测试和启动脚本。
+- [`ai-project-factory`](ai-project-factory)：Python 后台、React 前端、测试和启动脚本。
 - [`docs`](docs)：产品定义、设计与验收文档。
-- [运行节点与续跑说明](code/ai-project-factory/docs-run-flow.md)
-- [网页版 VS Code 说明](code/ai-project-factory/docs-web-editor.md)
+- [运行节点与续跑说明](ai-project-factory/docs-run-flow.md)
+- [网页版 VS Code 说明](ai-project-factory/docs-web-editor.md)
 
 ## 本地启动
 
@@ -15,7 +15,7 @@
 
 ```bash
 git clone git@github.com:shangbin-sun/AI-Naitve.git
-cd AI-Naitve/code/ai-project-factory
+cd AI-Naitve/ai-project-factory
 bash scripts/setup.sh
 backend/.venv/bin/python scripts/dev.py
 ```

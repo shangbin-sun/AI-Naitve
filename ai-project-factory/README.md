@@ -7,7 +7,7 @@
 需要 Python 3.11+、Node.js 20.19+（或 22.12+）、已安装并登录的 Codex CLI。
 
 ```bash
-cd code/ai-project-factory
+cd ai-project-factory
 bash scripts/setup.sh
 backend/.venv/bin/python scripts/dev.py
 ```
