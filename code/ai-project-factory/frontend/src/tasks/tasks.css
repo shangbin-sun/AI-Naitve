@@ -1,0 +1,90 @@
+.tasks-panel {
+  padding: 28px 32px;
+  color: #263449;
+}
+.tasks-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.tasks-header h2,
+.tasks-header h3 {
+  margin: 0 0 10px;
+}
+.tasks-header p {
+  color: #586980;
+  line-height: 1.7;
+  max-width: 850px;
+  white-space: pre-wrap;
+}
+.task-editor {
+  max-width: 850px;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #dce3ee;
+  border-radius: 14px;
+}
+.task-start,
+.task-run-meta,
+.task-run-select {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+.task-run-select .ant-select {
+  min-width: 330px;
+}
+.task-run-detail {
+  padding: 20px;
+  border: 1px solid #dce3ee;
+  border-radius: 14px;
+  background: #fff;
+}
+.task-run-detail pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 16px;
+  background: #f4f6fa;
+  max-height: 480px;
+  overflow: auto;
+}
+.task-run-detail p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-run-detail details {
+  margin: 16px 0;
+}
+.task-run-detail summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+@media (max-width: 700px) {
+  .tasks-panel {
+    padding: 16px;
+  }
+  .tasks-header {
+    flex-direction: column;
+  }
+  .task-run-select .ant-select {
+    min-width: 0;
+    width: 100%;
+  }
+  .task-run-detail {
+    padding: 12px;
+  }
+}
+
+.run-flow {margin:24px 0;padding:22px;background:#f7f9fd;border:1px solid #dce3ee;border-radius:16px}
+.run-flow h3 {margin:0 0 6px;color:#18253b}.run-flow p {color:#516079;margin:8px 0 18px}
+.run-flow-nodes {display:flex;gap:24px;overflow-x:auto;padding:18px 3px 12px}
+.run-flow-node {position:relative;flex:1;min-width:180px;background:white;border:1px solid #d6deea;border-radius:12px;padding:18px;min-height:190px}
+.run-flow-node:not(:last-child)::after {content:'→';position:absolute;right:-21px;top:48%;color:#7586a3}
+.run-flow-node h4 {font-size:16px;margin:12px 0 6px;color:#1c2c45}.run-flow-node p {font-size:12px;min-height:30px;margin-bottom:12px;overflow-wrap:anywhere}
+.run-flow-node .ant-btn {display:block;margin-top:18px}.run-flow-index {color:#5268bd;font-weight:700;font-size:12px}
+.run-flow-node.state-running {border:2px solid #526cf5;box-shadow:0 3px 16px #526cf51a}.run-flow-node.state-failed {border-color:#e38d89}.run-flow-node.state-completed {border-top:3px solid #35a780}
+.run-flow .run-flow-note {font-size:12px;margin-bottom:0;line-height:1.8}

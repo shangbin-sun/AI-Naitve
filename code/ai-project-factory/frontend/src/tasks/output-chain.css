@@ -1,0 +1,260 @@
+.employee-output-list {
+  color: #243247;
+}
+.employee-output-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  margin: 12px 0 24px;
+  flex-wrap: wrap;
+}
+.employee-output-heading h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.employee-output-heading > span,
+.employee-output-note,
+.employee-output-source {
+  color: #617087;
+  font-size: 13px;
+}
+.employee-output-group {
+  border-top: 2px solid #dce4f1;
+  padding: 22px 0 28px;
+}
+.employee-output-group > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.employee-output-group h4 {
+  margin: 0;
+  font-size: 19px;
+  color: #1c2b42;
+}
+.employee-output-group h4 > span {
+  display: inline-block;
+  margin-right: 12px;
+  color: #4c66d4;
+  font-size: 14px;
+}
+.employee-output-version {
+  margin-top: 20px;
+}
+.employee-output-source {
+  margin-bottom: 12px;
+}
+.employee-output-file {
+  margin: 14px 0;
+  border: 1px solid #dfe5ee;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.employee-output-file > h5 {
+  font-size: 14px;
+  margin: 0;
+  padding: 12px 16px;
+  background: #f7f9fc;
+  border-bottom: 1px solid #e4e9f0;
+  overflow-wrap: anywhere;
+}
+.employee-output-list .employee-output-file pre {
+  margin: 0;
+  max-height: 320px;
+  background: #fff;
+  color: #243247;
+  line-height: 1.7;
+  font-size: 13px;
+}
+.employee-output-file > p,
+.employee-document {
+  padding: 0 18px;
+}
+.employee-document {
+  line-height: 1.85;
+  font-size: 14px;
+}
+.employee-document h5 {
+  font-size: 14px;
+  margin: 16px 0 4px;
+}
+.employee-document p,
+.employee-document ul {
+  margin: 4px 0 16px;
+}
+.employee-document ul {
+  padding-left: 20px;
+}
+.employee-test-list {
+  margin-top: 16px;
+}
+.employee-test-list > div {
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #e8edf4;
+  flex-wrap: wrap;
+}
+.employee-test-list span {
+  font-size: 13px;
+  color: #617087;
+}
+.employee-output-empty {
+  padding: 16px;
+  background: #f7f9fc;
+  border-radius: 8px;
+}
+.employee-output-empty p {
+  margin-bottom: 0;
+  color: #617087;
+}
+.employee-output-list .employee-output-file {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 16px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid #e5eaf2;
+  border-radius: 0;
+}
+.employee-output-filename {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.employee-output-file > span:not(.employee-output-filename) {
+  color: #617087;
+  font-size: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .employee-output-group > header {
+    flex-wrap: wrap;
+  }
+  .employee-output-list .employee-output-file {
+    gap: 10px;
+    padding: 12px 0;
+  }
+}
+.employee-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 18px;
+  margin: 20px 0 28px;
+  align-items: start;
+}
+.employee-attachment-card {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid #dfe5ee;
+  border-radius: 14px;
+  background: #fafbfe;
+}
+.employee-attachment-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.employee-attachment-card h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #243247;
+}
+.employee-attachment-card h4 > span {
+  margin-right: 10px;
+  font-size: 12px;
+  color: #637795;
+}
+.employee-attachment-caption {
+  margin: 12px 0 8px;
+  font-size: 12px;
+  color: #64738a;
+}
+.employee-attachment-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.employee-attachment-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 2px;
+  border: 0;
+  background: transparent;
+  color: #34445e;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.employee-attachment-link:hover:not(:disabled) {
+  color: #3f5cd0;
+  background: #edf2fc;
+  border-radius: 6px;
+}
+.employee-attachment-link:focus-visible,
+.employee-attachment-all:focus-visible {
+  outline: 2px solid #5873d9;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.employee-attachment-link:disabled {
+  cursor: default;
+}
+.employee-attachment-icon {
+  width: 28px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid #dbe3ef;
+  border-radius: 5px;
+  background: #fff;
+  color: #5974b7;
+}
+.employee-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.employee-attachment-meta {
+  margin: 0 0 6px 42px;
+  font-size: 11px;
+  color: #687b95;
+}
+.employee-attachment-all {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: #516582;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.employee-attachment-all:hover {
+  color: #3f5cd0;
+}
+.output-file-browser > header { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin: 12px 0 20px; }
+.output-file-browser h3 { margin: 0; font-size: 18px; }
+.output-file-browser > header > span { color: #65748b; font-size: 12px; }
+.output-file-layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); border: 1px solid #dfe5ee; border-radius: 12px; overflow: hidden; min-height: 520px; }
+.output-file-layout nav { background: #f6f8fc; padding: 12px; border-right: 1px solid #dfe5ee; }
+.output-file-layout nav button { display: flex; gap: 10px; padding: 12px; width: 100%; text-align: left; border: 0; border-radius: 6px; background: transparent; color: #31435e; cursor: pointer; overflow-wrap: anywhere; }
+.output-file-layout nav button[aria-current="page"] { background: #e4ebff; color: #314fc1; }
+.output-file-layout nav button small { display: block; margin-top: 6px; color: #65748b; }
+.output-file-layout article { min-width: 0; padding: 18px; }
+.output-file-layout article h4 { margin: 0; overflow-wrap: anywhere; }
+.output-file-layout article p { font-size: 12px; color: #65748b; }
+.task-run-detail .output-file-layout pre { max-height: 65vh; margin-bottom: 0; }
+@media (max-width: 750px) { .output-file-layout { grid-template-columns: 1fr; } .output-file-layout nav { max-height: 220px; overflow: auto; border-right: 0; border-bottom: 1px solid #dfe5ee; } }

@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import EmployeeDirectoryFiles from '../tasks/EmployeeDirectoryFiles';
+import type { OutputStep } from '../tasks/buildOutputChain';
+afterEach(() => vi.unstubAllGlobals());
+it('文件清单显示真实相对路径，打开同一文件并刷新新增项', async () => {
+  const step={id:'run-analysis',origin:'run'} as OutputStep;
+  const file={relative_path:'outputs/plan.json',folder:'/employee/a',size:20,kind:'run_archive',sha256:'hash'};
+  const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({files:[{step_id:step.id,folder:file.folder}],directory_files:[file]})});
+  vi.stubGlobal('fetch',fetch);
+  const open=vi.fn();
+  render(<EmployeeDirectoryFiles steps={[step]} base='/api/runs' open={open} busy={false} />);
+  await userEvent.click(await screen.findByRole('button',{name:/outputs\/plan.json/}));
+  expect(open).toHaveBeenCalledWith(step,undefined,'outputs/plan.json');
+  expect(screen.getByText(/运行归档（平台整理）/)).toBeVisible();
+  fetch.mockResolvedValue({ok:true,json:async()=>({files:[{step_id:step.id,folder:file.folder}],directory_files:[file,{...file,relative_path:'workspace/new.txt',kind:'workspace_file'}]})});
+  await userEvent.click(screen.getByRole('button',{name:'刷新目录'}));
+  expect(await screen.findByText('workspace/new.txt')).toBeVisible();
+});

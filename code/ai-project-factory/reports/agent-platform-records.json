@@ -1,0 +1,64 @@
+{
+  "project_id": "5f7ffce47f1c4f67b1c4048324bb1695",
+  "version": 9,
+  "employee_versions": {
+    "requirements": 2,
+    "architect": 2,
+    "developer": 2,
+    "tester": 3,
+    "deployer": 2,
+    "quality": 2
+  },
+  "workflow_node_count": 13,
+  "runs": [
+    {
+      "id": "c4e4536210124bd289fac965c44d5f66",
+      "kind": "review",
+      "status": "completed",
+      "version": 9
+    },
+    {
+      "id": "eba8484401aa4ce1a209d6009e2e4503",
+      "kind": "requirements",
+      "status": "blocked",
+      "version": 9
+    },
+    {
+      "id": "dca12c82b14c4fb0958611b13f540dec",
+      "kind": "baseline",
+      "status": "blocked",
+      "version": 8
+    },
+    {
+      "id": "f257d25324754069b799e55601402eb2",
+      "kind": "baseline",
+      "status": "blocked",
+      "version": 1
+    },
+    {
+      "id": "995598711d8845ee9b2f491076035b87",
+      "kind": "review",
+      "status": "completed",
+      "version": 1
+    },
+    {
+      "id": "118b27c955d641928d242a379ef68805",
+      "kind": "baseline",
+      "status": "blocked",
+      "version": 1
+    },
+    {
+      "id": "92e48bec1d9f4adabc3b4ea591745f4f",
+      "kind": "baseline",
+      "status": "blocked",
+      "version": 1
+    }
+  ],
+  "review_counts": {
+    "blocked": 6,
+    "fail": 4,
+    "pass": 1,
+    "not_assessed": 1
+  },
+  "calibration_source": "38ffed55402c4a25bbab8063c5006eed"
+}

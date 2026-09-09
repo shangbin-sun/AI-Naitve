@@ -1,0 +1,35 @@
+{
+  "workspace_id": "1eb5b9f3d07d4703a6888d41e61b3134",
+  "version": 2,
+  "members_unchanged": true,
+  "workflow_changes": [
+    [
+      "requirements",
+      []
+    ],
+    [
+      "develop",
+      []
+    ],
+    [
+      "test",
+      [
+        "acceptance"
+      ]
+    ]
+  ],
+  "jobs": [
+    {
+      "id": "c23294c19c7948dc8ef5b6b2dc4e7b36",
+      "status": "cancelled"
+    },
+    {
+      "id": "d73d84ea12c0419f9ca057c90852927c",
+      "status": "completed"
+    },
+    {
+      "id": "71eec6bddee748ada65be17310c55be1",
+      "status": "completed"
+    }
+  ]
+}

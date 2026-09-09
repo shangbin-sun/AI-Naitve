@@ -1,0 +1,34 @@
+{
+  "run_id": "6d36c4f39f0146ee9c6f2ff45b057281",
+  "status": "completed",
+  "source_id": "5e8f4793df2449c7b8c85db6999bd6f5",
+  "reference_files": 40,
+  "test_classes": 39,
+  "passed": 247,
+  "failed": 0,
+  "skipped": 0,
+  "missing_classes": [],
+  "changed_files": [
+    "bom/build.gradle.kts",
+    "build.gradle.kts",
+    "gradlew"
+  ],
+  "workspace": "/Users/bingo/Desktop/code/ai_native/code/ai-project-factory/.data/deliveries/6d36c4f39f0146ee9c6f2ff45b057281/resume-baseline",
+  "workers": [
+    {
+      "id": "f511eb68c06d4e888adfa5ea245192c5",
+      "key": "it_analysis",
+      "version": 2
+    },
+    {
+      "id": "5050cd8ecb6144e9b5ec06c3a9b98ee9",
+      "key": "it_development",
+      "version": 2
+    },
+    {
+      "id": "11b10dbaedba49e4be9816596b67a1df",
+      "key": "it_validation",
+      "version": 2
+    }
+  ]
+}

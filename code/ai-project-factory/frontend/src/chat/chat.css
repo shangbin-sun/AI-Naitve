@@ -1,0 +1,219 @@
+.factory-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  color: #202c40;
+}
+.factory-chat-viewport {
+  flex: 1;
+  min-height: 180px;
+  max-height: 65vh;
+  overflow: auto;
+  padding: 24px 30px;
+  scroll-behavior: smooth;
+}
+.factory-chat-message {
+  margin: 0 0 26px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.factory-chat-author {
+  font-size: 13px;
+  color: #465675;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.factory-chat-body {
+  font-size: 15px;
+  line-height: 1.8;
+}
+.factory-chat-body p {
+  margin: 0 0 10px;
+}
+.factory-chat-body pre {
+  padding: 16px;
+  background: #f0f3f8;
+  overflow: auto;
+  border-radius: 10px;
+}
+.factory-chat-message.user .factory-chat-body {
+  background: #f1f4fc;
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+.factory-chat-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.factory-chat-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #d5ddec;
+  border-radius: 10px;
+  max-width: 280px;
+  font-size: 13px;
+}
+.factory-chat-attachment img {
+  object-fit: cover;
+  border-radius: 5px;
+}
+.factory-chat-attachment > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.factory-chat-attachment button {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 22px;
+  color: #43516a;
+}
+.factory-chat-compose-area {
+  width: 100%;
+  max-width: 1168px;
+  margin: 0 auto;
+  padding: 16px 24px 12px;
+  box-sizing: border-box;
+}
+.factory-chat-composer {
+  border: 1px solid #d4dce9;
+  border-radius: 18px;
+  padding: 16px 18px 12px;
+  background: #fff;
+  box-shadow: 0 3px 16px #24334d08;
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s;
+}
+.factory-chat-composer textarea {
+  display: block;
+  box-sizing: border-box;
+  resize: none;
+  border: 0;
+  width: 100%;
+  outline: none;
+  padding: 0 2px 14px;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #202c40;
+  background: transparent;
+}
+.factory-chat-composer textarea::placeholder {
+  color: #6b7890;
+}
+.factory-chat-composer:focus-within {
+  border-color: #8b9bea;
+  box-shadow:
+    0 0 0 3px #647bef0c,
+    0 4px 18px #24334d08;
+}
+.factory-chat-composer > .factory-chat-attachments:not(:empty) {
+  margin-bottom: 12px;
+}
+.factory-chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.factory-chat-image-hint {
+  flex: 1;
+  color: #69768b;
+  font-size: 12px;
+}
+.factory-chat-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex-shrink: 0;
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px 12px;
+  background: #f2f5f9;
+  color: #3c4b63;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.factory-chat-button:hover:not(:disabled) {
+  background: #e8edf5;
+}
+.factory-chat-button.primary {
+  background: #455ee3;
+  color: #fff;
+  padding: 6px 16px;
+}
+.factory-chat-button.primary:hover:not(:disabled) {
+  background: #364ece;
+}
+.factory-chat-button:disabled {
+  color: #8390a6;
+  background: #eef1f6;
+  cursor: not-allowed;
+}
+.factory-chat-button.primary:disabled {
+  color: #fff;
+  background: #a6b1e8;
+}
+.factory-chat-button:focus-visible {
+  outline: 3px solid #a6b5fc;
+  outline-offset: 2px;
+}
+.factory-chat-compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 6px 0;
+}
+.factory-chat-compose-footer > span {
+  color: #68758b;
+  font-size: 12px;
+}
+.factory-chat-compose-footer .factory-chat-build {
+  font-size: 12px;
+  color: #52627b;
+}
+.factory-chat-compose-footer .factory-chat-build:disabled {
+  color: #8a96a9;
+}
+.factory-chat-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  color: #465675;
+}
+.factory-chat-empty {
+  color: #596780;
+  line-height: 1.8;
+}
+@media (max-width: 700px) {
+  .factory-chat-viewport {
+    padding: 18px 14px;
+  }
+  .factory-chat-compose-area {
+    padding: 12px 12px 8px;
+  }
+  .factory-chat-composer {
+    padding: 14px 12px 10px;
+    border-radius: 14px;
+  }
+  .factory-chat-image-hint {
+    visibility: hidden;
+  }
+  .factory-chat-compose-footer {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}

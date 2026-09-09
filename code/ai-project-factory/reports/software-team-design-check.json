@@ -1,0 +1,87 @@
+{
+  "design_id": "a9371cefd9fa49ebbc92d1b980bf2d27",
+  "scope": "团队设计与工程产物；不代表已执行需求、开发、测试或部署",
+  "passed": true,
+  "checks": [
+    {
+      "check": "真实生成完成",
+      "passed": true,
+      "detail": "completed"
+    },
+    {
+      "check": "团队方案已就绪",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "需求分析阶段存在",
+      "passed": true,
+      "detail": "建立需求与验收基线, 按需审批需求范围变更"
+    },
+    {
+      "check": "架构设计阶段存在",
+      "passed": true,
+      "detail": "设计架构与交付契约"
+    },
+    {
+      "check": "开发阶段存在",
+      "passed": true,
+      "detail": "第1轮开发"
+    },
+    {
+      "check": "测试阶段存在",
+      "passed": true,
+      "detail": "第1轮独立测试"
+    },
+    {
+      "check": "部署阶段存在",
+      "passed": true,
+      "detail": "第1轮本机部署与验证, 第2轮本机部署与验证, 第3轮本机部署与验证, 按需审批生产部署申请"
+    },
+    {
+      "check": "所有步骤均有输入、输出、验收",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "人工审批有正确归属",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "开发与测试人员独立",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "AI 岗位均有员工工程",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "analyst工程可导出且岗位一致",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "architect工程可导出且岗位一致",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "developer工程可导出且岗位一致",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "tester工程可导出且岗位一致",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "release工程可导出且岗位一致",
+      "passed": true,
+      "detail": ""
+    }
+  ]
+}

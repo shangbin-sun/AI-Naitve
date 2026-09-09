@@ -1,0 +1,61 @@
+{
+  "project_id": "9d02ea589558479e9b2b6a24666694c6",
+  "task_id": "70401960fcd64133aa0ce58dcb88e42c",
+  "shared_team_unchanged_on_resume": true,
+  "tasks": [
+    {
+      "title": "Agent2 · 新输入待准备",
+      "run_count": 0
+    },
+    {
+      "title": "Agent1 · 参考测试交付验收",
+      "run_count": 2
+    }
+  ],
+  "runs": [
+    {
+      "id": "8a43b14542ce4f77aaa8400fd5c46f43",
+      "status": "completed",
+      "resume_run_id": "6f0fafeeca2147f894e906f8cd81b190",
+      "attempts": [
+        {
+          "attempt": 0,
+          "exit_code": 0,
+          "tests": {
+            "executed": 247,
+            "passed": 247,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "6f0fafeeca2147f894e906f8cd81b190",
+      "status": "completed",
+      "resume_run_id": null,
+      "attempts": [
+        {
+          "attempt": 0,
+          "exit_code": 1,
+          "tests": {
+            "executed": 0,
+            "passed": 0,
+            "failed": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "attempt": 1,
+          "exit_code": 0,
+          "tests": {
+            "executed": 247,
+            "passed": 247,
+            "failed": 0,
+            "skipped": 0
+          }
+        }
+      ]
+    }
+  ]
+}
