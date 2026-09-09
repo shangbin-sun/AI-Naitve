@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ProjectChat from "../chat/ProjectChat";
-import { createImageAdapter } from "../chat/attachments";
+import { createAttachmentAdapter } from "../chat/attachments";
 import { api } from "../api";
 vi.mock("../api", () => ({ api: vi.fn() }));
 function props() {
@@ -17,6 +17,41 @@ function props() {
   };
 }
 describe("项目对话", () => {
+  it("Markdown 无 MIME 时可上传，待发送与历史均不生成图片", async () => {
+    const doc = {
+      id: "markdown",
+      name: "整理日志.md",
+      content_type: "text/markdown",
+      url: "/api/markdown",
+    };
+    vi.mocked(api).mockResolvedValueOnce(doc);
+    const p = props();
+    const view = render(<ProjectChat {...p} />);
+    fireEvent.paste(screen.getByLabelText("讨论当前项目"), {
+      clipboardData: {
+        files: [new File(["# 文档正文"], doc.name)],
+      },
+    });
+    await screen.findByText(doc.name);
+    expect(screen.queryByAltText(doc.name)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "发送" }));
+    await waitFor(() => expect(p.onSend).toHaveBeenCalledWith("", [doc.id]));
+    view.rerender(
+      <ProjectChat
+        {...p}
+        messages={[
+          {
+            id: "saved",
+            role: "user",
+            content: "查看文档",
+            attachments: [doc],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText(doc.name)).toBeVisible();
+    expect(screen.queryByAltText(doc.name)).toBeNull();
+  });
   it("空消息不可发送，Enter 发送文字并清空输入", async () => {
     const p = props();
     render(<ProjectChat {...p} />);
@@ -120,7 +155,7 @@ describe("项目对话", () => {
       content_type: "image/png",
       url: "/api/a",
     });
-    const adapter = createImageAdapter("one", vi.fn());
+    const adapter = createAttachmentAdapter("one", vi.fn());
     const image = await adapter.add({
       file: new File(["png"], "图.png", { type: "image/png" }),
     });
@@ -134,6 +169,21 @@ describe("项目对话", () => {
       "/workspaces/one/chat-attachments/a",
       { method: "DELETE" },
     );
+  });
+  it("普通文件上传保留文件类型并发送附件 ID", async () => {
+    vi.mocked(api).mockResolvedValueOnce({
+      id: "doc",
+      name: "需求.pdf",
+      content_type: "application/pdf",
+      url: "/api/doc",
+    });
+    const adapter = createAttachmentAdapter("one", vi.fn());
+    const file = await adapter.add({
+      file: new File(["pdf"], "需求.pdf", { type: "application/pdf" }),
+    });
+    if (!("id" in file)) throw new Error("Expected attachment");
+    expect(file.type).toBe("file");
+    expect((await adapter.send(file)).status).toEqual({ type: "complete" });
   });
   it("粘贴图片后可单独发送，并传递附件 ID", async () => {
     vi.mocked(api).mockResolvedValueOnce({
@@ -176,7 +226,7 @@ describe("项目对话", () => {
   });
   it("不支持格式在上传之前报错", async () => {
     const error = vi.fn();
-    const adapter = createImageAdapter("one", error);
+    const adapter = createAttachmentAdapter("one", error);
     await expect(
       adapter.add({
         file: new File(["svg"], "x.svg", { type: "image/svg+xml" }),
@@ -184,4 +234,42 @@ describe("项目对话", () => {
     ).rejects.toThrow("支持");
     expect(error).toHaveBeenCalled();
   });
+});
+
+it("显式员工引用可移除，普通聊天不显示选择器", async () => {
+  const onReferenceChange = vi.fn();
+  render(
+    <ProjectChat
+      {...props()}
+      employees={[{ id: "writer", profile: { name: "文案员工" } }]}
+      employeeReference="writer"
+      onReferenceChange={onReferenceChange}
+      messages={[
+        {
+          id: "ref-message",
+          role: "user",
+          content: "优化输出",
+          employee_reference: { id: "writer", name: "文案员工" },
+        },
+      ]}
+    />,
+  );
+  expect(screen.queryByRole("combobox")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "移除员工引用" }));
+  expect(onReferenceChange).toHaveBeenCalledWith("");
+  expect(screen.getAllByText("引用员工 · 文案员工")).toHaveLength(2);
+});
+
+it("未引用员工时直接输入，不要求手动选择目标", () => {
+  render(
+    <ProjectChat
+      {...props()}
+      employees={[{ id: "writer", profile: { name: "文案员工" } }]}
+      onReferenceChange={vi.fn()}
+    />,
+  );
+  expect(screen.queryByRole("combobox")).toBeNull();
+  expect(screen.queryByText("关联员工")).toBeNull();
+  expect(screen.queryByRole("button", { name: "移除员工引用" })).toBeNull();
+  expect(screen.getByLabelText("讨论当前项目")).toBeEnabled();
 });

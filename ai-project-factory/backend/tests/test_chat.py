@@ -46,6 +46,20 @@ def test_invalid_images_and_empty_message(workspace):
     assert client.get(image["url"]).status_code == 404
 
 
+def test_document_attachment_upload_and_download(workspace):
+    client, _ = workspace
+    identity = new(client)
+    response = client.post(f"/api/workspaces/{identity}/chat-attachments", json={
+        "name": "需求.md", "content_type": "text/markdown",
+        "data": base64.b64encode("# 需求".encode()).decode(),
+    })
+    assert response.status_code == 201
+    attachment = response.json()
+    downloaded = client.get(attachment["url"])
+    assert downloaded.status_code == 200
+    assert downloaded.content == b"# \xe9\x9c\x80\xe6\xb1\x82"
+
+
 def test_images_reach_runtime_with_message_association(workspace):
     client, runtime = workspace
     original = runtime.generate
@@ -60,4 +74,4 @@ def test_images_reach_runtime_with_message_association(workspace):
     client.post(f"/api/workspaces/{identity}/messages", json={"content": "按图调整", "attachment_ids": [image["id"]], "request_id": "vision", "expected_version": 0})
     wait_job(client, identity, "completed")
     assert base64.b64decode(observed[0]["chat_images"][0]["data"]) == binary
-    assert observed[0]["conversation"][0]["id"] == observed[0]["chat_images"][0]["message_id"]
+    assert observed[0]["message_id"] == observed[0]["chat_images"][0]["message_id"]

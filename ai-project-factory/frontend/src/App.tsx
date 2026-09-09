@@ -1,3 +1,4 @@
+import EmployeeWorkflow from "./workflow/EmployeeWorkflow";
 import {
   lazy,
   Suspense,
@@ -26,10 +27,8 @@ import {
   CodeOutlined,
   DownloadOutlined,
   EditOutlined,
-  ExperimentOutlined,
   FileTextOutlined,
   HistoryOutlined,
-  NodeIndexOutlined,
   PlusOutlined,
   ProjectOutlined,
   RobotOutlined,
@@ -123,6 +122,10 @@ export default function FactoryApp() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [syncError, setSyncError] = useState("");
+  const [employeeReference, setEmployeeReference] = useState("");
+  useEffect(() => {
+    setEmployeeReference("");
+  }, [active]);
   const [editor, setEditor] = useState<Employee | null>(null);
   const [employeeRouteId, setEmployeeRouteId] = useState(readRoute().employee);
   const [raw, setRaw] = useState<string | null>(null);
@@ -155,7 +158,10 @@ export default function FactoryApp() {
   }, []);
   const refreshDesign = useCallback(async (id: string) => {
     const d = await api<Design>(`/workspaces/${id}`);
-    if (activeRef.current === id) {setDesign(d); setSyncError("");}
+    if (activeRef.current === id) {
+      setDesign(d);
+      setSyncError("");
+    }
   }, []);
 
   useEffect(() => {
@@ -175,23 +181,18 @@ export default function FactoryApp() {
   }, [active, refreshDesign]);
   useEffect(() => {
     if (!active) return;
-    const generating = !!job && ["queued", "running"].includes(job.status);
     let inFlight = false;
-    const timer = window.setInterval(
-      async () => {
-        if (inFlight) return;
-        inFlight = true;
-        try {
-          await refreshDesign(active);
-          if (generating) await refreshLists();
-        } catch (e) {
-          setSyncError((e as Error).message);
-        } finally {
-          inFlight = false;
-        }
-      },
-      generating ? 1500 : 6000,
-    );
+    const timer = window.setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        await refreshDesign(active);
+      } catch (e) {
+        setSyncError((e as Error).message);
+      } finally {
+        inFlight = false;
+      }
+    }, 6000);
     return () => clearInterval(timer);
   }, [active, job?.status, refreshDesign, refreshLists]);
   async function send(
@@ -219,12 +220,13 @@ export default function FactoryApp() {
       }
       if (
         !requestRef.current ||
-        requestRef.current.content !== JSON.stringify([value, attachmentIds]) ||
+        requestRef.current.content !==
+          JSON.stringify([value, attachmentIds, employeeReference]) ||
         requestRef.current.designId !== id
       )
         requestRef.current = {
           id: crypto.randomUUID(),
-          content: JSON.stringify([value, attachmentIds]),
+          content: JSON.stringify([value, attachmentIds, employeeReference]),
           designId: id,
         };
       await api(`/workspaces/${id}/messages`, {
@@ -232,12 +234,14 @@ export default function FactoryApp() {
         body: JSON.stringify({
           content: value,
           attachment_ids: attachmentIds,
+          employee_id: employeeReference || undefined,
           request_id: requestRef.current.id,
           expected_version: version,
         }),
       });
       accepted = true;
       requestRef.current = null;
+      setEmployeeReference("");
       setText("");
       await refreshDesign(id);
       await refreshLists();
@@ -523,7 +527,10 @@ export default function FactoryApp() {
             message={error || syncError}
             type="error"
             closable
-            onClose={() => {setError(""); setSyncError("");}}
+            onClose={() => {
+              setError("");
+              setSyncError("");
+            }}
           />
         )}
 
@@ -667,22 +674,28 @@ export default function FactoryApp() {
                   items={[
                     { key: "overview", label: "概览" },
                     { key: "conversation", label: "对话" },
-                    { key: "plan", label: "团队" },
+                    { key: "plan", label: "工作流" },
                     { key: "tasks", label: "任务与运行" },
                     { key: "history", label: "版本记录" },
                     { key: "evidence", label: "资料与评估" },
                   ]}
                 />
                 {projectTab === "tasks" && (
-                  <Suspense fallback={<Spin />}>
-                    <TasksPanel
-                      key={design.id}
-                      projectId={design.id}
-                      onSources={() =>
-                        navigate("design", design.id, "evidence")
-                      }
+                  <>
+                    <RunPreparation
+                      draft={design.draft as Draft}
+                      onQuestion={askProject}
                     />
-                  </Suspense>
+                    <Suspense fallback={<Spin />}>
+                      <TasksPanel
+                        key={design.id}
+                        projectId={design.id}
+                        onSources={() =>
+                          navigate("design", design.id, "evidence")
+                        }
+                      />
+                    </Suspense>
+                  </>
                 )}
                 {projectTab === "evidence" && (
                   <EvidencePanel
@@ -740,7 +753,7 @@ export default function FactoryApp() {
                       <h3>下一步</h3>
                       <p>
                         {!design.draft.name
-                          ? "描述目标，让项目助手生成需求、团队和工作流。"
+                          ? "直接告诉 Codex 你的目标，让它生成或调整团队和工作流。"
                           : "检查团队职责、工作交接和验收条件，再补齐运行依赖。"}
                       </p>
                       {(design.draft.questions || []).map((q) => (
@@ -826,7 +839,7 @@ export default function FactoryApp() {
                 >
                   <section
                     hidden={projectTab !== "conversation"}
-                    className={`chat-panel ${projectTab !== "conversation" ? "is-hidden" : ""}`}
+                    className={`chat-panel codex-chat-panel ${projectTab !== "conversation" ? "is-hidden" : ""}`}
                   >
                     <div className="panel-heading">
                       <span>
@@ -848,6 +861,19 @@ export default function FactoryApp() {
                       <ProjectChat
                         key={design.id}
                         workspaceId={design.id}
+                        employees={design.employees}
+                        employeeReference={employeeReference}
+                        onReferenceChange={setEmployeeReference}
+                        jobId={job?.id}
+                        jobCreatedAt={job?.created_at}
+                        jobFinishedAt={job?.finished_at}
+                        threadId={design.codex_conversation?.thread_id}
+                        onSettled={() => {
+                          void Promise.all([
+                            refreshDesign(design.id),
+                            refreshLists(),
+                          ]).catch((e) => setSyncError(e.message));
+                        }}
                         draftText={text}
                         messages={design.messages ?? []}
                         busy={busy}
@@ -903,38 +929,20 @@ export default function FactoryApp() {
                     hidden={projectTab !== "plan"}
                     className={`preview-panel ${projectTab !== "plan" ? "is-hidden" : ""}`}
                   >
-                    <div className="panel-heading">
-                      <span>项目方案 · 团队与工作流</span>
-                      <div>
-                        <small>修订 {design.version}</small>{" "}
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<EditOutlined />}
-                          disabled={!design.draft.name}
-                          onClick={() => {
-                            setRaw(JSON.stringify(design.draft, null, 2));
-                            setRawVersion(design.version);
-                          }}
-                        >
-                          编辑方案
-                        </Button>
-                      </div>
-                    </div>
                     {!design.draft.name ? (
                       <div className="preview-empty">
                         <div className="empty-orbit">
                           <TeamOutlined />
                         </div>
-                        <h3>团队正在构思中</h3>
+                        <h3>工作流正在构思中</h3>
                         <p>
-                          聊清目标后，岗位、工作流和待完善事项
+                          聊清目标后，员工与协作关系
                           <br />
                           会自动出现在这里。
                         </p>
                       </div>
                     ) : (
-                      <TeamPreview
+                      <WorkflowPreview
                         draft={design.draft as Draft}
                         onEmployee={openEmployee}
                         onQuestion={askProject}
@@ -1090,6 +1098,17 @@ export default function FactoryApp() {
             editorDirty.current = dirty;
           }}
           onClose={closeEditor}
+          onDiscuss={() => {
+            const selected = editor;
+            setEditor(null);
+            editorDirty.current = false;
+            navigate("design", selected.design_id, "conversation");
+            // Apply selection after a possible project change clears the old reference.
+            setTimeout(() => {
+              setEmployeeReference(selected.id);
+              setText("请根据当前配置和运行记录，帮我优化这个员工。");
+            }, 0);
+          }}
           onSave={async (e) => {
             setEditor(e);
             await refreshLists();
@@ -1208,12 +1227,16 @@ export function ProjectDetails({
           返回当前项目方案
         </Button>
       </div>
-      <TeamPreview
+      <WorkflowPreview
         draft={project.snapshot.team}
         onEmployee={(m) => {
           setMember(m);
           setSelectedFile("instructions/role.md");
         }}
+        onQuestion={(q) => onEditTeam(q)}
+      />
+      <RunPreparation
+        draft={project.snapshot.team}
         onQuestion={(q) => onEditTeam(q)}
       />
       <WorkspacePage
@@ -1324,7 +1347,7 @@ export function ProjectDetails({
   );
 }
 
-function TeamPreview({
+function WorkflowPreview({
   draft,
   onEmployee,
   onQuestion,
@@ -1333,199 +1356,95 @@ function TeamPreview({
   onEmployee?: (m: Member) => void;
   onQuestion?: (q: string) => void;
 }) {
-  const MemberCard = onEmployee ? "button" : "div";
   return (
     <div className="team-preview">
-      <div className="goal-card">
-        <span className="section-kicker">项目目标</span>
-        <h3>{draft.name}</h3>
-        <p>{draft.goal}</p>
-      </div>
-      <Tabs
-        items={[
-          {
-            key: "team",
-            label: (
-              <span>
-                <TeamOutlined /> 团队{" "}
-                <span className="count">{draft.members.length}</span>
-              </span>
-            ),
-            children: (
-              <div className="members">
-                {draft.members.map((m, i) => (
-                  <MemberCard
-                    className="member-row"
-                    key={m.key}
-                    onClick={onEmployee ? () => onEmployee(m) : undefined}
-                  >
-                    <div
-                      className={`member-avatar ${m.kind === "human" ? "human-avatar" : ""}`}
-                    >
-                      {m.kind === "human" ? (
-                        <UserOutlined />
-                      ) : (
-                        <RobotOutlined />
-                      )}
-                    </div>
-                    <div className="member-content">
-                      <div>
-                        <strong>{m.name}</strong>
-                        <Tag
-                          bordered={false}
-                          color={m.kind === "human" ? "gold" : "blue"}
-                        >
-                          {m.kind === "human" ? "人类" : "AI 员工"}
-                        </Tag>
-                      </div>
-                      <p>{m.role}</p>
-                      <ul>
-                        {m.responsibilities.slice(0, 3).map((r, k) => (
-                          <li key={k}>{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <span className="member-number">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                  </MemberCard>
-                ))}
-              </div>
-            ),
-          },
-          {
-            key: "workflow",
-            label: (
-              <span>
-                <NodeIndexOutlined /> 工作流{" "}
-                <span className="count">{draft.workflow.length}</span>
-              </span>
-            ),
-            children: (
-              <div className="flow-list">
-                {draft.workflow.map((s, i) => (
-                  <div className="flow-step" key={s.key}>
-                    <div className="step-number">{i + 1}</div>
-                    <div className="step-body">
-                      <div>
-                        <strong>{s.name}</strong>
-                        <Tag>
-                          {s.kind === "approval"
-                            ? "人工决策"
-                            : s.kind === "review"
-                              ? "评审检查"
-                              : "执行工作"}
-                        </Tag>
-                      </div>
-                      <p className="step-owner">
-                        {onEmployee ? (
-                          <Button
-                            type="link"
-                            size="small"
-                            onClick={() => {
-                              const owner = draft.members.find(
-                                (m) => m.key === s.owner,
-                              );
-                              if (owner) onEmployee(owner);
-                            }}
-                          >
-                            查看负责人：
-                            {draft.members.find((m) => m.key === s.owner)?.name}
-                          </Button>
-                        ) : (
-                          draft.members.find((m) => m.key === s.owner)?.name
-                        )}
-                      </p>
-                      {s.depends_on.length > 0 && (
-                        <p className="dependency">
-                          等待：
-                          {s.depends_on
-                            .map(
-                              (k) =>
-                                draft.workflow.find((x) => x.key === k)?.name ||
-                                k,
-                            )
-                            .join("、")}
-                        </p>
-                      )}
-                      <dl>
-                        <dt>输入</dt>
-                        <dd>{s.input}</dd>
-                        <dt>交付</dt>
-                        <dd>{s.output}</dd>
-                        <dt>验收</dt>
-                        <dd>{s.acceptance}</dd>
-                      </dl>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ),
-          },
-          {
-            key: "requirements",
-            label: (
-              <span>
-                <ExperimentOutlined /> 待完善{" "}
-                <span className="count">{draft.requirements.length}</span>
-              </span>
-            ),
-            children: (
-              <div>
-                {draft.requirements.length ? (
-                  draft.requirements.map((r, i) => (
-                    <div className="requirement" key={i}>
-                      <Badge status={r.blocking ? "warning" : "default"} />
-                      <div>
-                        <strong>{r.name}</strong>
-                        <p>{r.description}</p>
-                        <small>
-                          {r.blocking ? "正式运行前需要补齐" : "可以后续完善"}
-                        </small>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <Empty
-                    description="暂无额外资源声明；员工仍需评测后使用"
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  />
-                )}
-                <Alert
-                  type="info"
-                  message="保存草稿不会自动安装工具、绑定凭据或启动外部任务。"
-                />
-              </div>
-            ),
-          },
-        ]}
+      <EmployeeWorkflow
+        draft={draft}
+        onEmployee={onEmployee}
+        onQuestion={onQuestion}
       />
-      {draft.questions.length > 0 && (
+    </div>
+  );
+}
+
+function RunPreparation({
+  draft,
+  onQuestion,
+}: {
+  draft: Draft;
+  onQuestion?: (question: string) => void;
+}) {
+  const requirements = draft.requirements || [];
+  return (
+    <section
+      className="workflow-detail"
+      aria-label="运行准备"
+      style={{ marginBottom: 24 }}
+    >
+      <div className="workflow-detail-heading">
+        <h3>运行准备</h3>
+        <span>
+          {requirements.length} 项依赖 ·{" "}
+          {requirements.filter((item) => item.blocking).length} 项运行前需补齐
+        </span>
+      </div>
+      {requirements.length ? (
+        requirements.map((item, index) => (
+          <div className="requirement" key={index}>
+            <Badge status={item.blocking ? "warning" : "default"} />
+            <div>
+              <strong>{item.name}</strong>
+              <p>{item.description}</p>
+              <small>
+                {item.blocking ? "正式运行前需要补齐" : "可以后续完善"}
+              </small>
+              {onQuestion && (
+                <Button
+                  type="link"
+                  onClick={() =>
+                    onQuestion(
+                      `请帮我完善运行准备中的“${item.name}”：${item.description}`,
+                    )
+                  }
+                >
+                  讨论如何补齐
+                </Button>
+              )}
+            </div>
+          </div>
+        ))
+      ) : (
+        <p>
+          尚未声明额外运行依赖；请结合具体任务检查资料、工具和凭据是否齐备。
+        </p>
+      )}
+      {!!draft.questions?.length && (
         <div className="questions">
-          <span className="section-kicker">还想和你确认</span>
-          {draft.questions.map((q, i) =>
+          <span className="section-kicker">运行前待确认</span>
+          {draft.questions.map((question, index) =>
             onQuestion ? (
-              <button key={i} onClick={() => onQuestion(`${q}\n我的回答：`)}>
-                {q}
+              <button
+                key={index}
+                onClick={() => onQuestion(`${question}\n我的回答：`)}
+              >
+                {question}
                 <ArrowRightOutlined />
               </button>
             ) : (
-              <p className="snapshot-question" key={i}>
-                {q}
-              </p>
+              <p key={index}>{question}</p>
             ),
           )}
         </div>
       )}
-      {draft.assumptions.length > 0 && (
-        <div className="assumptions">
-          <span className="section-kicker">当前假设</span>
-          {draft.assumptions.map((s, i) => (
-            <p key={i}>• {s}</p>
+      {!!draft.assumptions?.length && (
+        <details className="workflow-internal-steps">
+          <summary>当前假设 · {draft.assumptions.length} 项</summary>
+          {draft.assumptions.map((item, index) => (
+            <p key={index}>{item}</p>
           ))}
-        </div>
+        </details>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -1535,10 +1454,12 @@ export function EmployeeEditor({
   onClose,
   onSave,
   onDirtyChange,
+  onDiscuss,
 }: {
   employee: Employee;
   projectTitle?: string;
   onDirtyChange?: (dirty: boolean) => void;
+  onDiscuss?: () => void;
   onClose: () => void;
   onSave: (e: Employee) => Promise<void>;
 }) {
@@ -1597,15 +1518,26 @@ export function EmployeeEditor({
       open
       onClose={close}
       extra={
-        <Button
-          type="primary"
-          icon={<CheckOutlined />}
-          loading={saving}
-          disabled={!dirty}
-          onClick={() => void save()}
-        >
-          保存修改
-        </Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {onDiscuss && (
+            <Button
+              disabled={dirty || saving}
+              title={dirty ? "请先保存当前修改" : "在项目对话中引用此员工"}
+              onClick={onDiscuss}
+            >
+              讨论／优化此员工
+            </Button>
+          )}
+          <Button
+            type="primary"
+            icon={<CheckOutlined />}
+            loading={saving}
+            disabled={!dirty}
+            onClick={() => void save()}
+          >
+            保存修改
+          </Button>
+        </div>
       }
     >
       <div className="editor-notice">

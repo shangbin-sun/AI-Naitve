@@ -65,9 +65,11 @@ async def run_employee(manager, identity, inputs):
         path.write_text(content)
     run=await execute(workspace,['employee.py'],inputs['input_json'])
     actual=json.loads(run['stdout']) if run['exit_code']==0 else None
-    return {**run,'output':json.dumps(actual,ensure_ascii=False,indent=2) if actual is not None else run['stderr'],
+    expected = inputs.get('expected_json')
+    comparison = {'expected': json.loads(expected), 'actual': actual, 'passed': run['exit_code'] == 0 and actual == json.loads(expected)} if expected is not None else None
+    return {**run,'comparison': comparison, 'output':json.dumps(actual,ensure_ascii=False,indent=2) if actual is not None else run['stderr'],
         'workspace':str(workspace),'employee_version':inputs['employee_version'],
-        'files_hash':digest(inputs['files']),'scope':'员工实际试运行；本次输入没有预期答案，不代表业务验收通过'}, 'completed' if run['exit_code']==0 else 'blocked'
+        'files_hash':digest(inputs['files']),'scope': '员工实际试运行；对照所提供预期JSON，非完整业务验收' if comparison else '员工实际试运行；本次输入没有预期答案，不代表业务验收通过'}, 'completed' if run['exit_code']==0 and (comparison is None or comparison['passed']) else 'blocked'
 
 
 SPEC_SYSTEM = '''你是平台员工研发任务分析器。根据用户目标和来源资料设计一个可实际运行的Python标准库员工，范围限JSON数据处理/校验/契约整理，不声称实现整个车辆系统。

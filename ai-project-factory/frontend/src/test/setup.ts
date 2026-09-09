@@ -7,17 +7,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 Object.defineProperty(window, "matchMedia", {
-  value: vi
-    .fn()
-    .mockImplementation((query) => ({
-      matches: false,
-      media: query,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
+  value: vi.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
 });
 class ResizeObserver {
   observe() {}
@@ -39,3 +37,11 @@ vi.stubGlobal("localStorage", {
 window.scrollTo = vi.fn();
 
 Element.prototype.scrollTo = vi.fn();
+
+class TestEventSource {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: (() => void) | null = null;
+  close = vi.fn();
+  constructor(public url: string) {}
+}
+vi.stubGlobal("EventSource", TestEventSource);

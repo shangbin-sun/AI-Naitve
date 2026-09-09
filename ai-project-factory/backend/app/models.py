@@ -114,3 +114,39 @@ class Evaluation(Base):
     result: Mapped[dict] = mapped_column(JSON, default=dict)
     error: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[str] = mapped_column(String, default=now)
+
+
+class CodexConversation(Base):
+    """One durable Codex thread per project; local messages are the display archive."""
+    __tablename__ = 'codex_conversations'
+    design_id: Mapped[str] = mapped_column(ForeignKey('designs.id'), primary_key=True)
+    thread_id: Mapped[str] = mapped_column(String, unique=True)
+    imported_messages: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[str] = mapped_column(String, default=now)
+
+
+class ChatOperation(Base):
+    """Additive table keeps existing SQLite databases compatible without ALTER."""
+    __tablename__ = 'chat_operations'
+    job_id: Mapped[str] = mapped_column(ForeignKey('jobs.id'), primary_key=True)
+    message_id: Mapped[str] = mapped_column(ForeignKey('messages.id'))
+    mode: Mapped[str] = mapped_column(String, default='chat')
+    turn_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class ToolOperation(Base):
+    __tablename__ = 'project_tool_operations'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    design_id: Mapped[str] = mapped_column(ForeignKey('designs.id'), index=True)
+    job_id: Mapped[str] = mapped_column(ForeignKey('jobs.id'))
+    action: Mapped[str] = mapped_column(String)
+    fingerprint: Mapped[str] = mapped_column(String)
+    result: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[str] = mapped_column(String, default=now)
+
+
+class MessageReference(Base):
+    __tablename__ = 'message_references'
+    message_id: Mapped[str] = mapped_column(ForeignKey('messages.id'), primary_key=True)
+    employee_id: Mapped[str] = mapped_column(ForeignKey('employees.id'))
+    name: Mapped[str] = mapped_column(String)

@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, model_serializer
 
 
 class Strict(BaseModel):
@@ -36,7 +36,21 @@ class Requirement(Strict):
     blocking: bool
 
 
+class HumanRouting(Strict):
+    default_owner: str | None = Field(default=None, description="默认接收所有AI升级问题的人类成员key；null沿用首个人类成员，无人类时使用内置项目负责人。@project_owner表示内置负责人。")
+    assignments: dict[str, str] = Field(default_factory=dict, description="按AI成员key指定专属人类接收人key，例如需求AI交给需求人类、架构AI交给架构人类；未指定走默认负责人。")
+
+
 class Draft(Strict):
+    human_routing: HumanRouting | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_compatible(self, handler):
+        value = handler(self)
+        if self.human_routing is None:
+            value.pop('human_routing', None)
+        return value
+
     name: str = Field(min_length=1, max_length=200)
     goal: str = Field(max_length=10000)
     members: list[Member] = Field(max_length=20)
@@ -52,6 +66,14 @@ class Draft(Strict):
         keys = [x.key for x in self.workflow]
         if len(set(members)) != len(members) or len(set(keys)) != len(keys):
             raise ValueError("岗位和流程标识不能重复")
+        if self.human_routing:
+            human_keys = {m.key for m in self.members if m.kind == 'human'} | {'@project_owner'}
+            ai_keys = {m.key for m in self.members if m.kind == 'ai'}
+            if self.human_routing.default_owner and self.human_routing.default_owner not in human_keys:
+                raise ValueError('默认问题接收人必须是本项目的人类员工')
+            for ai, human in self.human_routing.assignments.items():
+                if ai not in ai_keys or human not in human_keys:
+                    raise ValueError('人工分工必须从本项目AI员工指向人类员工')
         graph = {s.key: s.depends_on for s in self.workflow}
         for step in self.workflow:
             if step.owner not in members:
@@ -96,7 +118,14 @@ class DesignResponse(Strict):
     draft: Draft
 
 
+class ChatResponse(Strict):
+    reply: str = Field(min_length=1, max_length=15000)
+    # Explicit null means conversation only; never overwrite the saved design.
+    draft: Draft | None
+
+
 class SendMessage(Strict):
+    employee_id: str | None = Field(default=None, max_length=32)
     content: str = Field(default="", max_length=12000)
     attachment_ids: list[str] = Field(default_factory=list, max_length=4)
     request_id: str = Field(min_length=1, max_length=100)

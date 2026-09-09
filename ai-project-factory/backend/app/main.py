@@ -1,10 +1,14 @@
+from .message_timing import message_timings
 import asyncio
 import io
 import json
 import zipfile
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -12,8 +16,10 @@ from sqlalchemy import select
 from .config import Settings
 from .database import make_database
 from .jobs import JobManager
-from .models import Design, Employee, Job, Message, Project, Revision
+from .performance import PerformanceLog
+from .models import Design, Employee, Job, Message, Project, Revision, CodexConversation, ChatOperation, MessageReference
 from .runtime import CodexRuntime
+from .project_tools import ProjectTools, install_project_tools
 from .schemas import EditDraft, EditEmployee, SendMessage
 from .service import apply_draft, edit_employee, get_design, instantiate
 from .evidence import EvidenceManager, install_evidence
@@ -32,6 +38,12 @@ class NewDesign(BaseModel):
     goal: str = Field(default="", max_length=10000)
 
 
+class BrowserTiming(BaseModel):
+    event: Literal['first_reply_received', 'frame_after_reply']
+    elapsed_ms: float = Field(ge=0, le=3_600_000, allow_inf_nan=False)
+
+
+
 class Instantiate(BaseModel):
     expected_version: int
 
@@ -41,8 +53,12 @@ def create_app(settings=None, runtime=None):
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     engine, sessions = make_database(settings.database_url)
     runtime = runtime or CodexRuntime(settings)
-    manager = JobManager(sessions, runtime)
+    performance = PerformanceLog(settings.data_dir)
+    manager = JobManager(sessions, runtime, performance)
     evidence = EvidenceManager(sessions, runtime, settings)
+    project_tools = ProjectTools(sessions, manager, evidence)
+    if isinstance(runtime, CodexRuntime):
+        runtime.project_tools = project_tools
 
     @asynccontextmanager
     async def lifespan(app):
@@ -52,11 +68,14 @@ def create_app(settings=None, runtime=None):
         await manager.shutdown()
         await evidence.shutdown()
         engine.dispose()
+        performance.close()
 
     app = FastAPI(title="AI Project Factory", version="0.1.0", lifespan=lifespan)
     app.state.sessions = sessions
     app.state.manager = manager
     app.state.evidence = evidence
+    app.state.project_tools = project_tools
+    install_project_tools(app, project_tools)
     install_evidence(app, evidence)
     install_builder(app, evidence)
     install_delivery(app, evidence)
@@ -101,15 +120,27 @@ def create_app(settings=None, runtime=None):
         with sessions() as db:
             row = get_design(db, identity)
             attachments = message_attachments(db, identity)
+            messages = list(db.scalars(select(Message).where(Message.design_id == identity).order_by(Message.created_at)))
+            jobs = list(db.scalars(select(Job).where(Job.design_id == identity).order_by(Job.created_at.desc())))
+            timings = message_timings(messages, jobs)
+            references = {r.message_id: {"id": r.employee_id, "name": r.name} for r in db.scalars(select(MessageReference).join(Message, Message.id == MessageReference.message_id).where(Message.design_id == identity))}
             return {**record(row),
-                "messages": [{**record(m), "attachments": attachments.get(m.id, [])} for m in db.scalars(select(Message).where(Message.design_id == identity).order_by(Message.created_at))],
-                "jobs": [record(j) for j in db.scalars(select(Job).where(Job.design_id == identity).order_by(Job.created_at.desc()))],
+                "messages": [{**record(m), "attachments": attachments.get(m.id, []), "timing": timings.get(m.id), "employee_reference": references.get(m.id)} for m in messages],
+                "codex_conversation": record(db.get(CodexConversation, identity)) if db.get(CodexConversation, identity) else None,
+                "jobs": [record(j) for j in jobs],
                 "employees": [record(e) for e in db.scalars(select(Employee).where(Employee.design_id == identity, Employee.active.is_(True)))],
             }
 
     @app.post("/api/workspaces/{identity}/messages", status_code=202)
-    @app.post("/api/designs/{identity}/messages", status_code=202, include_in_schema=False)
     async def send_message(identity: str, data: SendMessage):
+        return await enqueue_message(identity, data, 'chat')
+
+    @app.post("/api/workspaces/{identity}/plan", status_code=202)
+    @app.post("/api/designs/{identity}/messages", status_code=202, include_in_schema=False)
+    async def generate_plan(identity: str, data: SendMessage):
+        return await enqueue_message(identity, data, 'plan')
+
+    async def enqueue_message(identity: str, data: SendMessage, mode: str):
         if not data.content.strip() and not data.attachment_ids:
             raise HTTPException(422, "请输入消息")
         async with manager.lock:
@@ -117,21 +148,82 @@ def create_app(settings=None, runtime=None):
                 row = get_design(db, identity)
                 duplicate = db.scalar(select(Job).where(Job.design_id == identity, Job.request_id == data.request_id))
                 if duplicate:
+                    operation = db.get(ChatOperation, duplicate.id)
+                    if operation and operation.mode != mode:
+                        raise HTTPException(409, '请求标识已用于另一种操作')
                     return record(duplicate)
                 if db.scalar(select(Job).where(Job.design_id == identity, Job.status.in_(["queued", "running"]))):
                     raise HTTPException(409, "当前团队正在生成，请等待完成或先停止")
                 if row.version != data.expected_version:
                     raise HTTPException(409, "团队已更新，请刷新后发送")
-                message = Message(design_id=identity, role="user", content=data.content.strip())
+                reference = None
+                if data.employee_id:
+                    reference = project_tools.employee(db, identity, data.employee_id)
+                message = Message(design_id=identity, role="user", content=data.content)
                 db.add(message)
                 db.flush()
                 bind_attachments(db, identity, message.id, data.attachment_ids)
+                if reference:
+                    db.add(MessageReference(message_id=message.id, employee_id=reference.id, name=reference.profile['name']))
                 job = Job(design_id=identity, request_id=data.request_id, base_version=row.version)
                 db.add(job)
                 db.flush()
+                db.add(ChatOperation(job_id=job.id, message_id=message.id, mode=mode))
                 result = record(job)
             manager.start(result["id"])
             return result
+
+    @app.get("/api/jobs/{identity}/events")
+    async def job_events(identity: str, request: Request):
+        with sessions() as db:
+            if not db.get(Job, identity):
+                raise HTTPException(404, "运行不存在")
+
+        async def events():
+            previous = None
+            first_reply = True
+            changed = manager.subscribe(identity)
+            performance.emit(identity, 'sse_connected')
+            try:
+                while not await request.is_disconnected():
+                    # Clear before reading so notifications during a read/yield cannot be lost.
+                    changed.clear()
+                    with sessions() as db:
+                        job = db.get(Job, identity)
+                        payload = {"id": job.id, "status": job.status,
+                                   "reply": manager.previews.get(identity, (job.proposal or {}).get("reply", "")),
+                                   "error": job.error,
+                                   "message": job.logs[-1]["message"] if job.logs else "等待生成…"}
+                    encoded = json.dumps(payload, ensure_ascii=False)
+                    if encoded != previous:
+                        if payload['reply'] and first_reply:
+                            performance.emit(identity, 'sse_first_reply', reply_chars=len(payload['reply']))
+                            first_reply = False
+                        yield f"data: {encoded}\n\n"
+                        previous = encoded
+                    if payload["status"] not in ("queued", "running"):
+                        break
+                    try:
+                        await asyncio.wait_for(changed.wait(), 10)
+                    except asyncio.TimeoutError:
+                        yield ": heartbeat\n\n"
+            finally:
+                manager.unsubscribe(identity, changed)
+
+        return StreamingResponse(events(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.post("/api/jobs/{identity}/browser-timing", status_code=204)
+    def browser_timing(identity: str, data: BrowserTiming):
+        with sessions() as db:
+            job = db.get(Job, identity)
+            if not job:
+                raise HTTPException(404, "运行不存在")
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(job.created_at)).total_seconds() * 1000
+        performance.emit(identity, 'browser_' + data.event,
+                         connection_elapsed_ms=round(data.elapsed_ms, 3),
+                         server_job_age_ms=round(age, 3))
+        return Response(status_code=204)
 
     @app.post("/api/jobs/{identity}/cancel")
     async def cancel(identity: str):

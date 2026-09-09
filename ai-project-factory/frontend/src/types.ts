@@ -20,6 +20,10 @@ export type Step = {
   acceptance: string;
 };
 export type Draft = {
+  human_routing?: {
+    default_owner?: string | null;
+    assignments?: Record<string, string>;
+  } | null;
   name: string;
   goal: string;
   members: Member[];
@@ -30,12 +34,14 @@ export type Draft = {
   ready: boolean;
 };
 export type Job = {
+  created_at?: string;
+  finished_at?: string | null;
   id: string;
   status: string;
   error: string;
   logs: { at: string; message: string }[];
   usage: Record<string, number>;
-  proposal?: { reply: string; draft: Draft };
+  proposal?: { reply: string; draft: Draft | null };
 };
 export type Employee = {
   id: string;
@@ -52,6 +58,7 @@ export type Design = {
   version: number;
   draft: Partial<Draft>;
   updated_at: string;
+  codex_conversation?: { thread_id: string; imported_messages: number } | null;
   messages?: import("./chat/types").ChatMessage[];
   jobs?: Job[];
   employees?: Employee[];

@@ -12,6 +12,8 @@ class Settings:
     codex_model: str
     timeout_seconds: int
     codex_reasoning_effort: str = "medium"
+    chat_reasoning_effort: str = "medium"
+    chat_lean_context: bool = True
 
     @classmethod
     def from_env(cls):
@@ -28,4 +30,6 @@ class Settings:
             codex_model=os.getenv("CODEX_MODEL", ""),
             timeout_seconds=int(os.getenv("CODEX_TIMEOUT_SECONDS", "300")),
             codex_reasoning_effort=os.getenv("CODEX_REASONING_EFFORT", "medium"),
+            chat_reasoning_effort=os.getenv("CODEX_CHAT_REASONING_EFFORT", os.getenv("CODEX_REASONING_EFFORT", "medium")),
+            chat_lean_context=os.getenv("FACTORY_CHAT_LEAN_CONTEXT", "1") != "0",
         )

@@ -18,12 +18,21 @@ import {
   StopOutlined,
   ExperimentOutlined,
 } from "@ant-design/icons";
-import { createImageAdapter } from "./attachments";
+import { createAttachmentAdapter } from "./attachments";
 import "./chat.css";
+import ProcessingTime from "./ProcessingTime";
 
 import type { ChatMessage } from "./types";
 type Props = {
   workspaceId: string;
+  employees?: { id: string; profile: { name: string } }[];
+  employeeReference?: string;
+  onReferenceChange?: (id: string) => void;
+  jobId?: string;
+  jobCreatedAt?: string;
+  jobFinishedAt?: string | null;
+  onSettled?: () => void;
+  threadId?: string;
   draftText?: string;
   messages: ChatMessage[];
   busy: boolean;
@@ -40,15 +49,23 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
     id: message.id,
     role: message.role === "user" ? "user" : "assistant",
     content: message.content,
+    metadata: {
+      custom: {
+        timing: message.timing,
+        employeeReference: message.employee_reference,
+      },
+    },
     attachments:
       message.role === "user"
         ? (message.attachments ?? []).map((image) => ({
             id: image.id,
             name: image.name,
-            type: "image",
+            type: image.content_type.startsWith("image/") ? "image" : "file",
             contentType: image.content_type,
             status: { type: "complete" },
-            content: [{ type: "image", image: image.url }],
+            content: image.content_type.startsWith("image/")
+              ? [{ type: "image", image: image.url }]
+              : [],
           }))
         : undefined,
   };
@@ -56,11 +73,18 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
 
 function Attachment({ removable = false }: { removable?: boolean }) {
   const attachment = useAuiState((s) => s.attachment);
-  const image = attachment.content?.find((part) => part.type === "image");
+  const image = attachment.contentType?.startsWith("image/")
+    ? attachment.content?.find((part) => part.type === "image")
+    : undefined;
   return (
     <AttachmentPrimitive.Root className="factory-chat-attachment">
       {image?.type === "image" && (
         <Image src={image.image} alt={attachment.name} width={88} height={64} />
+      )}
+      {!image && (
+        <span aria-hidden="true" className="factory-chat-file-icon">
+          📎
+        </span>
       )}
       <AttachmentPrimitive.Name />
       {removable && (
@@ -71,23 +95,43 @@ function Attachment({ removable = false }: { removable?: boolean }) {
     </AttachmentPrimitive.Root>
   );
 }
-const PendingImage = () => <Attachment removable />;
-const SavedImage = () => <Attachment />;
+const PendingAttachment = () => <Attachment removable />;
+const SavedAttachment = () => <Attachment />;
 const MarkdownText = ({ text }: { text: string }) => (
   <Markdown>{text}</Markdown>
 );
 function Message() {
   const role = useAuiState((s) => s.message.role);
+  const employeeReference = useAuiState(
+    (s) => s.message.metadata.custom?.employeeReference,
+  ) as ChatMessage["employee_reference"];
+  const timing = useAuiState(
+    (s) => s.message.metadata.custom?.timing,
+  ) as ChatMessage["timing"];
   return (
     <MessagePrimitive.Root className={`factory-chat-message ${role}`}>
       <div className="factory-chat-author">
-        {role === "user" ? "你" : "✳ 项目助手"}
+        <span>{role === "user" ? "你" : "✳ 项目助手"}</span>
+        {role === "assistant" && timing && (
+          <ProcessingTime
+            startedAt={timing.started_at}
+            finishedAt={timing.finished_at}
+            running={Boolean(timing.running)}
+          />
+        )}
       </div>
+      {employeeReference && (
+        <div className="factory-chat-reference">
+          引用员工 · {employeeReference.name}
+        </div>
+      )}
       <div className="factory-chat-body">
         <MessagePrimitive.Parts components={{ Text: MarkdownText }} />
       </div>
       <div className="factory-chat-attachments">
-        <MessagePrimitive.Attachments components={{ Attachment: SavedImage }} />
+        <MessagePrimitive.Attachments
+          components={{ Attachment: SavedAttachment }}
+        />
       </div>
     </MessagePrimitive.Root>
   );
@@ -101,13 +145,14 @@ function BuildButton({ onBuild, busy }: Pick<Props, "onBuild" | "busy">) {
       size="small"
       icon={<ExperimentOutlined aria-hidden="true" />}
       className="factory-chat-build"
+      aria-label="按原有测试构建并验证"
       disabled={busy || text.trim().length < 10 || attachments.length > 0}
       title={
-        attachments.length ? "先发送图片并完善方案，再启动构建验证" : undefined
+        attachments.length ? "先发送附件并完善方案，再启动构建验证" : undefined
       }
       onClick={() => void onBuild(text)}
     >
-      按原有测试构建并验证
+      构建验证
     </Button>
   );
 }
@@ -117,11 +162,91 @@ export default function ProjectChat(props: Props) {
   const [error, setError] = useState("");
   const submitting = useRef(false);
   const attachments = useMemo(
-    () => createImageAdapter(props.workspaceId, setError),
+    () => createAttachmentAdapter(props.workspaceId, setError),
     [props.workspaceId],
   );
+  const [stream, setStream] = useState<{
+    id: string;
+    reply: string;
+    status: string;
+    message: string;
+  } | null>(null);
+  const [reconnecting, setReconnecting] = useState(false);
+  const settledRef = useRef(props.onSettled);
+  settledRef.current = props.onSettled;
+  useEffect(() => {
+    setStream(null);
+    setReconnecting(false);
+    if (!props.jobId) return;
+    const connectedAt = performance.now();
+    let measured = false;
+    let frame = 0;
+    const report = (event: string) => {
+      // Two small, content-free samples per connection, never per text delta.
+      navigator.sendBeacon?.(
+        `/api/jobs/${props.jobId}/browser-timing`,
+        new Blob(
+          [
+            JSON.stringify({
+              event,
+              elapsed_ms: performance.now() - connectedAt,
+            }),
+          ],
+          { type: "application/json" },
+        ),
+      );
+    };
+    const source = new EventSource(`/api/jobs/${props.jobId}/events`);
+    source.onmessage = (event) => {
+      const snapshot = JSON.parse(event.data);
+      setStream(snapshot);
+      setReconnecting(false);
+      if (snapshot.reply && !measured) {
+        measured = true;
+        report("first_reply_received");
+        frame = requestAnimationFrame(() => {
+          frame = requestAnimationFrame(() => report("frame_after_reply"));
+        });
+      }
+      if (!["queued", "running"].includes(snapshot.status)) {
+        source.close();
+        settledRef.current?.();
+      }
+    };
+    source.onerror = () => setReconnecting(true);
+    return () => {
+      source.close();
+      cancelAnimationFrame(frame);
+    };
+  }, [props.jobId]);
+  const current = stream?.id === props.jobId ? stream : null;
+  const lastMessage = props.messages.at(-1);
+  const alreadySaved =
+    current?.status === "completed" &&
+    lastMessage?.role === "assistant" &&
+    lastMessage.content === current.reply;
+  // Create the current turn before its first text delta, so its author and
+  // timer use the same header throughout waiting, streaming and persistence.
+  const preview = !alreadySaved && (props.busy || Boolean(current?.reply));
+  const messages = preview
+    ? [
+        ...props.messages,
+        {
+          id: `stream-${props.jobId}`,
+          role: "assistant",
+          content: current?.reply ?? "",
+          timing: props.jobCreatedAt
+            ? {
+                started_at: props.jobCreatedAt,
+                finished_at: props.jobFinishedAt,
+                running: props.busy,
+              }
+            : undefined,
+        },
+      ]
+    : props.messages;
   const runtime = useExternalStoreRuntime({
-    messages: props.messages,
+    messages,
     convertMessage,
     isRunning: props.busy,
     adapters: { attachments },
@@ -130,7 +255,7 @@ export default function ProjectChat(props: Props) {
         throw new MessageNotSentError("请等待当前任务完成");
       const ids = (message.attachments ?? []).map((a) => a.id);
       if (ids.length > 4) {
-        setError("每条消息最多发送 4 张图片，请移除多余图片");
+        setError("每条消息最多发送 4 个附件，请移除多余附件");
         throw new MessageNotSentError();
       }
       submitting.current = true;
@@ -162,15 +287,21 @@ export default function ProjectChat(props: Props) {
       <ThreadPrimitive.Root className="factory-chat">
         <ThreadPrimitive.Viewport className="factory-chat-viewport">
           <ThreadPrimitive.Empty>
-            <p className="factory-chat-empty">
-              描述你的调整，或上传流程图、截图，一起完善当前项目。
-            </p>
+            <div className="factory-chat-empty">
+              <span aria-hidden="true" className="factory-chat-empty-mark">
+                ✳
+              </span>
+              <h2>从一个想法开始</h2>
+              <p>聊聊你想做什么，我们一起把它变成可以执行的项目。</p>
+            </div>
           </ThreadPrimitive.Empty>
           <ThreadPrimitive.Messages components={{ Message }} />
           {props.busy && (
             <div className="factory-chat-progress" role="status">
               <Spin size="small" />
-              {props.status || "正在连接 Codex…"}
+              {reconnecting
+                ? "连接中断，正在重连…"
+                : current?.message || props.status || "正在连接 Codex…"}
             </div>
           )}
           {props.failure && <Alert type="warning" message={props.failure} />}
@@ -187,12 +318,32 @@ export default function ProjectChat(props: Props) {
           <ComposerPrimitive.Root className="factory-chat-composer">
             <div className="factory-chat-attachments">
               <ComposerPrimitive.Attachments
-                components={{ Attachment: PendingImage }}
+                components={{ Attachment: PendingAttachment }}
               />
             </div>
+            {props.employeeReference && (
+              <div className="factory-chat-reference-picker">
+                <span>
+                  引用员工 ·{" "}
+                  {props.employees?.find(
+                    (employee) => employee.id === props.employeeReference,
+                  )?.profile.name ?? "当前员工"}
+                </span>
+                {props.onReferenceChange && (
+                  <button
+                    type="button"
+                    aria-label="移除员工引用"
+                    disabled={props.busy}
+                    onClick={() => props.onReferenceChange?.("")}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )}
             <ComposerPrimitive.Input
               aria-label="讨论当前项目"
-              placeholder="描述工作流调整，也可以粘贴图片…"
+              placeholder="直接与 Codex 对话，也可以添加文件或粘贴图片…"
               minRows={2}
               maxRows={7}
               maxLength={12000}
@@ -206,23 +357,46 @@ export default function ProjectChat(props: Props) {
               >
                 <PictureOutlined aria-hidden="true" /> 添加图片
               </ComposerPrimitive.AddAttachment>
-              <span className="factory-chat-image-hint">支持粘贴截图</span>
+              <ComposerPrimitive.AddAttachment
+                disabled={props.busy}
+                className="factory-chat-button"
+              >
+                📎 添加文件
+              </ComposerPrimitive.AddAttachment>
+              <span className="factory-chat-image-hint" />
               {props.busy ? (
                 <ComposerPrimitive.Cancel
                   disabled={!props.canCancel}
-                  className="factory-chat-button"
+                  className="factory-chat-button factory-chat-submit"
+                  aria-label="停止"
+                  title="停止生成"
                 >
-                  <StopOutlined aria-hidden="true" /> 停止
+                  <StopOutlined aria-hidden="true" />
                 </ComposerPrimitive.Cancel>
               ) : (
-                <ComposerPrimitive.Send className="factory-chat-button primary">
-                  <ArrowUpOutlined aria-hidden="true" /> 发送
+                <ComposerPrimitive.Send
+                  className="factory-chat-button primary factory-chat-submit"
+                  aria-label="发送"
+                  title="发送消息"
+                >
+                  <ArrowUpOutlined aria-hidden="true" />
                 </ComposerPrimitive.Send>
               )}
             </div>
           </ComposerPrimitive.Root>
           <div className="factory-chat-compose-footer">
-            <span>Enter 发送 · Shift + Enter 换行 · 最多 4 张图片</span>
+            <span>Enter 发送 · Shift + Enter 换行 · 图片和文件最多 4 个</span>
+            <span
+              className="factory-chat-session"
+              title={
+                props.threadId
+                  ? "持续会话 · 历史由 Codex 管理"
+                  : "首次发送后建立持续会话"
+              }
+            >
+              <i aria-hidden="true" />
+              {props.threadId ? "上下文已连接" : "准备就绪"}
+            </span>
             <BuildButton
               busy={props.busy}
               onBuild={async (goal) => {

@@ -10,7 +10,9 @@ from .schemas import DesignResponse
 
 
 SYSTEM = """你是 AI 项目工厂的团队设计助手。通过中文对话帮助用户设计适用于任意领域的团队。
-返回符合提供 schema 的 JSON：reply 是给用户的自然中文回复，draft 是完整最新方案。
+返回符合提供 schema 的 JSON：先输出 reply 给用户自然中文回复，再输出 draft。
+普通问候、致谢、能力介绍、解释已有方案且无需修改时，draft 必须为 null，不要复制或重建方案。
+用户提出项目目标、补充需求或要求修改方案时，draft 必须是完整最新方案；不得只回复承诺而遗漏方案更新。
 团队包括 AI 和人类。流程 owner 必须引用成员 key，depends_on 只能引用存在节点，禁止循环。
 优先提出可用方案，reply每轮最多追问3个关键问题，draft.questions必须保留全部尚未解决的已知疑问，不得为控制追问数量丢弃问题。只要目标、基本岗位与主要流程清楚，ready=true，自动生成可编辑草稿；
 未配置真实工具、凭据、数据和环境不阻塞草稿，将它们列入 requirements，说明是否阻塞实际执行。
@@ -25,6 +27,7 @@ SYSTEM = """你是 AI 项目工厂的团队设计助手。通过中文对话帮�
 class CodexRuntime:
     def __init__(self, settings):
         self.settings = settings
+        self.chat_connection = None
 
     async def status(self):
         processes = []
@@ -48,7 +51,38 @@ class CodexRuntime:
                     await process.communicate()
 
     async def generate(self, context, on_event):
-        return await self.structured(context, DesignResponse, SYSTEM, on_event)
+        from .codex_session import CodexConnection, persistent_generate
+        if self.chat_connection is None:
+            self.chat_connection = CodexConnection(self.settings)
+        async def on_thread(identity, imported):
+            await on_event({'type': 'thread', 'thread_id': identity, 'imported_messages': imported})
+        async def on_turn(identity):
+            await on_event({'type': 'turn', 'turn_id': identity})
+        plan_system = SYSTEM + '\n本次是用户明确触发的方案保存操作，draft 必须是完整方案，不能为 null。'
+        tools = getattr(self, 'project_tools', None)
+        if tools and context.get('project_id'):
+            tools.active[context['project_id']] = context['job_id']
+            context['tool_config'] = {
+                'command': __import__('sys').executable,
+                'args': ['-m', 'app.project_mcp'],
+                'cwd': str(Path(__file__).resolve().parents[1]),
+                'env': {'FACTORY_TOOL_ENDPOINT': os.getenv('FACTORY_TOOL_ENDPOINT', 'http://127.0.0.1:8000'),
+                        'FACTORY_TOOL_PROJECT': context['project_id'],
+                        'FACTORY_TOOL_TOKEN': tools.token(context['project_id'])},
+                'enabled': True, 'required': True,
+                'enabled_tools': ['get_project_overview', 'get_employee', 'get_team_schema', 'get_source', 'list_runs', 'get_run', 'update_employee', 'apply_team_changes', 'evaluate_employee'],
+                'tools': {name: {'approval_mode': 'approve'} for name in ['get_project_overview', 'get_employee', 'get_team_schema', 'get_source', 'list_runs', 'get_run', 'update_employee', 'apply_team_changes', 'evaluate_employee']},
+                'startup_timeout_sec': 15, 'tool_timeout_sec': 60,
+            }
+        try:
+            return await persistent_generate(self.chat_connection, context, on_event, on_thread, on_turn, plan_system)
+        finally:
+            if tools and context.get('project_id') and tools.active.get(context['project_id']) == context['job_id']:
+                tools.active.pop(context['project_id'], None)
+
+    async def close(self):
+        if self.chat_connection:
+            await self.chat_connection.close()
 
     async def structured(self, context, response_model, system, on_event):
         self.settings.data_dir.mkdir(parents=True, exist_ok=True)

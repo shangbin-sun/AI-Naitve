@@ -228,10 +228,17 @@ describe("工作台入口", () => {
     await user.click(
       await screen.findByRole("button", { name: /交互测试团队/ }),
     );
-    await user.click(await screen.findByRole("tab", { name: "团队" }));
-    await user.click(await screen.findByRole("tab", { name: /工作流/ }));
-    expect(await screen.findByText("分析需求")).toBeVisible();
-    await user.click(screen.getByRole("tab", { name: /待完善/ }));
+    await user.click(await screen.findByRole("tab", { name: "工作流" }));
+    await user.click(
+      screen.getByRole("button", { name: /测试分析员.*查看详情/ }),
+    );
+    expect(await screen.findByLabelText("员工名称")).toHaveValue("测试分析员");
+    await user.click(screen.getByRole("button", { name: "关闭" }));
+    expect(
+      screen.queryByRole("region", { name: "测试分析员的协作详情" }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /编辑方案/ })).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "任务与运行" }));
     expect(screen.getByText("等待配置")).toBeVisible();
     await user.click(screen.getByRole("button", { name: /使用什么数据/ }));
     expect(screen.getByLabelText("讨论当前项目")).toHaveValue(
@@ -246,21 +253,6 @@ describe("工作台入口", () => {
         screen.queryByRole("dialog", { name: "方案修订历史" }),
       ).not.toBeInTheDocument(),
     );
-  });
-  it("编辑方案错误不会关闭，取消可以关闭", async () => {
-    const user = factory();
-    await user.click(
-      await screen.findByRole("button", { name: /交互测试团队/ }),
-    );
-    await user.click(await screen.findByRole("tab", { name: "团队" }));
-    await user.click(await screen.findByRole("button", { name: /编辑方案/ }));
-    const dialog = screen.getByRole("dialog");
-    await user.clear(within(dialog).getByRole("textbox"));
-    await user.type(within(dialog).getByRole("textbox"), "invalid json");
-    await user.click(within(dialog).getByRole("button", { name: /保存草稿/ }));
-    expect(dialog).toBeVisible();
-    await user.click(within(dialog).getByRole("button", { name: /取\s*消/ }));
-    await waitFor(() => expect(dialog).not.toBeVisible());
   });
   it("员工库入口和项目快照打开关闭，问题可跳回团队", async () => {
     const user = factory();
@@ -324,7 +316,7 @@ describe("异步操作", () => {
     await user.click(
       await screen.findByRole("button", { name: /交互测试团队/ }),
     );
-    await user.click(await screen.findByRole("tab", { name: "团队" }));
+    await user.click(await screen.findByRole("tab", { name: "工作流" }));
     await user.click(screen.getByRole("tab", { name: "对话" }));
     await user.type(
       await screen.findByLabelText("讨论当前项目"),
@@ -338,15 +330,12 @@ describe("异步操作", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /发送/ })).toBeDisabled();
   });
-  it("保存团队方案和创建项目草稿有完成反馈", async () => {
+  it("保存项目快照有完成反馈", async () => {
     const user = factory();
     await user.click(
       await screen.findByRole("button", { name: /交互测试团队/ }),
     );
-    await user.click(await screen.findByRole("tab", { name: "团队" }));
-    await user.click(await screen.findByRole("button", { name: /编辑方案/ }));
-    await user.click(screen.getByRole("button", { name: /保存草稿/ }));
-    expect(await screen.findByText("方案已保存")).toBeVisible();
+    await user.click(await screen.findByRole("tab", { name: "工作流" }));
     await user.click(screen.getByRole("tab", { name: "版本记录" }));
     await user.click(screen.getByRole("button", { name: /保存方案快照/ }));
     expect(
@@ -368,7 +357,9 @@ describe("项目内员工详情", () => {
   it("项目成员可打开，完整指令与版本可见，文件只读且下载对应快照", async () => {
     const user = userEvent.setup();
     mount(<ProjectDetails project={project} onEditTeam={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /测试分析员 AI/ }));
+    await user.click(
+      screen.getByRole("button", { name: /测试分析员.*查看详情/ }),
+    );
     expect(await screen.findByText(member.instructions)).toBeVisible();
     expect(
       screen.getByText(/项目快照 · 团队修订 1 · 员工版本 1/),
@@ -394,8 +385,9 @@ describe("项目内员工详情", () => {
     const user = userEvent.setup(),
       onEdit = vi.fn();
     mount(<ProjectDetails project={project} onEditTeam={onEdit} />);
-    await user.click(screen.getByRole("tab", { name: /工作流/ }));
-    await user.click(screen.getByRole("button", { name: /查看负责人/ }));
+    await user.click(
+      screen.getByRole("button", { name: /测试分析员.*查看详情/ }),
+    );
     const detail = await screen.findByRole("dialog");
     await user.click(
       within(detail).getByRole("button", { name: /返回当前项目方案/ }),
@@ -466,22 +458,24 @@ describe("项目中心主流程", () => {
     expect(await screen.findByLabelText("员工名称")).toHaveValue(member.name);
     await user.click(screen.getByRole("button", { name: "关闭" }));
     expect(window.location.hash).toBe("#/projects/design-1/plan");
-    expect(screen.getByRole("tab", { name: "团队" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "工作流" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.getByRole("button", { name: /测试分析员 AI/ })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /测试分析员.*查看详情/ }),
+    ).toBeVisible();
   });
   it("浏览器返回会恢复项目标签", async () => {
     const user = factory();
     await user.click(
       await screen.findByRole("button", { name: /交互测试团队/ }),
     );
-    await user.click(await screen.findByRole("tab", { name: "团队" }));
+    await user.click(await screen.findByRole("tab", { name: "工作流" }));
     await user.click(screen.getByRole("tab", { name: "对话" }));
     window.history.back();
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: "团队" })).toHaveAttribute(
+      expect(screen.getByRole("tab", { name: "工作流" })).toHaveAttribute(
         "aria-selected",
         "true",
       ),
