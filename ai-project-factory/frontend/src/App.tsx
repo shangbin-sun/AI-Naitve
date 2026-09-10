@@ -35,7 +35,7 @@ import {
 const TasksPanel = lazy(() => import("./tasks/TasksPanel"));
 const ProjectChat = lazy(() => import("./chat/ProjectChat"));
 const DashboardPanel = lazy(() => import('./DashboardPanel'));
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import WorkspacePage from "./WorkspacePage";
 import type {
   Design,
@@ -109,7 +109,6 @@ export default function FactoryApp() {
   );
   const [filesOpen, setFilesOpen] = useState(false);
   const [taskLaunch,setTaskLaunch]=useState<{employee?:string;nonce:number}>();
-  const [search, setSearch] = useState("");
   const [design, setDesign] = useState<Design | null>(null);
   const [runtime, setRuntime] = useState<Runtime | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -144,12 +143,31 @@ export default function FactoryApp() {
     setEmployees(e);
   }, []);
   const refreshDesign = useCallback(async (id: string) => {
-    const d = await api<Design>(`/workspaces/${id}`);
-    if (activeRef.current === id) {
-      setDesign(d);
-      setSyncError("");
+    try {
+      const d = await api<Design>(`/workspaces/${id}`);
+      if (activeRef.current === id) {
+        setDesign(d);
+        setSyncError("");
+      }
+    } catch (e) {
+      if (activeRef.current !== id) return;
+      if (e instanceof ApiError && e.status === 404) {
+        activeRef.current = null;
+        setDesign(null);
+        setEditor(null);
+        setRaw(null);
+        setFilesOpen(false);
+        setError("");
+        setSyncError("");
+        requestRef.current = null;
+        localStorage.removeItem("factory.design");
+        navigate("projects", null, "conversation", true);
+        await refreshLists();
+        return;
+      }
+      throw e;
     }
-  }, []);
+  }, [refreshLists]);
 
   useEffect(() => {
     refreshLists().catch((e) => setError(e.message));
@@ -419,9 +437,9 @@ export default function FactoryApp() {
             AI 工作室<small>AI STUDIO</small>
           </div>
         </a>
-        <button className="sidebar-create-team" aria-label="新建团队" title="新建团队" onClick={() => {
+        <button className="sidebar-create-team" aria-label="新建AI团队" title="新建AI团队" onClick={() => {
           setText(""); navigate("design", null, "conversation");
-        }}><PlusOutlined /><span>新建团队</span></button>
+        }}><PlusOutlined /><span>新建AI团队</span></button>
         <section className="sidebar-teams" aria-label="AI 团队列表">
           <div className="sidebar-teams-heading">
             <span>我的 AI 团队</span>
@@ -437,7 +455,6 @@ export default function FactoryApp() {
                 <TeamOutlined /><span>{team.title}</span>
               </button>
             ))}
-            {!designs.length && <p>还没有 AI 团队</p>}
           </div>
         </section>
         <nav>
@@ -776,31 +793,7 @@ export default function FactoryApp() {
           </section>
         )}
         {view === "projects" && (
-          <section className="library project-library">
-            <div className="project-list-heading">
-              <div className="library-heading">
-                <div className="eyebrow small">YOUR AI TEAMS</div>
-                <h1>AI 团队</h1>
-                <p>从目标开始，让团队、方案与每一次迭代留在同一个AI 团队里。</p>
-              </div>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setText("");
-                  navigate("design", null, "conversation");
-                }}
-              >
-                新建AI 团队
-              </Button>
-            </div>
-            <Input.Search
-              className="project-search"
-              placeholder="搜索AI 团队名称或目标"
-              allowClear
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <section className={`library project-library${designs.length ? "" : " project-library-empty"}`}>
             {!designs.length ? (
               <Empty className="spaced" description="从第一个目标开始">
                 <Button
@@ -812,11 +805,6 @@ export default function FactoryApp() {
             ) : (
               <div className="employee-grid spaced">
                 {designs
-                  .filter((d) =>
-                    `${d.title} ${d.draft.goal || ""}`
-                      .toLowerCase()
-                      .includes(search.toLowerCase()),
-                  )
                   .map((d) => (
                     <button
                       className="employee-card project-card"
@@ -844,12 +832,7 @@ export default function FactoryApp() {
                   ))}
               </div>
             )}
-            {designs.length > 0 &&
-              !designs.some((d) =>
-                `${d.title} ${d.draft.goal || ""}`
-                  .toLowerCase()
-                  .includes(search.toLowerCase()),
-              ) && <Empty className="spaced" description="没有匹配的AI 团队" />}
+
           </section>
         )}
       </main>

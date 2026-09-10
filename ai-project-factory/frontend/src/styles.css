@@ -2193,3 +2193,13 @@ div.member-row:hover {
   .sidebar-create-team { justify-content: center; margin: 20px 0; padding: 10px; }
   .sidebar-create-team > span:not(.anticon) { display: none; }
 }
+
+.project-library.project-library-empty {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.project-library-empty > .ant-empty { margin: 0; }

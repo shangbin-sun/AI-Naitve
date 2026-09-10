@@ -4,9 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { App as AntApp, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import Factory, { EmployeeEditor, ProjectDetails } from "../App";
-import { api } from "../api";
+import { api, ApiError } from "../api";
 import type { Employee, Draft, Design } from "../types";
-vi.mock("../api", () => ({ api: vi.fn() }));
+vi.mock("../api", async (importOriginal) => ({ ...await importOriginal<typeof import("../api")>(), api: vi.fn() }));
 const mocked = vi.mocked(api);
 const member = {
   key: "analyst",
@@ -213,9 +213,24 @@ function factory() {
   return userEvent.setup();
 }
 describe("工作台入口", () => {
+  it("已删除团队地址返回首页并清除引用，空侧栏不显示占位文字", async () => {
+    window.location.hash = "#/projects/deleted/conversation";
+    localStorage.setItem("factory.design", "deleted");
+    mocked.mockImplementation(async (path) => {
+      if (path === "/workspaces/deleted") throw new ApiError("团队不存在", 404);
+      if (path === "/runtime") return { logged_in: true };
+      return [];
+    });
+    mount(<Factory />);
+    await waitFor(() => expect(window.location.hash).toBe("#/projects"));
+    expect(localStorage.getItem("factory.design")).toBeNull();
+    expect(screen.queryByText("团队不存在")).toBeNull();
+    expect(screen.queryByText("还没有 AI 团队")).toBeNull();
+    expect(screen.getByRole("button", { name: "新建AI团队" })).toBeEnabled();
+  });
   it("首页示例填入输入，发送从禁用变为可用", async () => {
     const user = factory();
-    await user.click(screen.getByRole("button", { name: /新建AI 团队/ }));
+    await user.click(screen.getByRole("button", { name: "新建AI团队" }));
     expect(screen.getByRole("button", { name: /创建AI 团队/ })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: /模型实验团队/ }));
     expect(
@@ -399,7 +414,7 @@ describe("整页导航", () => {
       expect(screen.queryByLabelText("员工名称")).not.toBeInTheDocument(),
     );
     expect(
-      screen.getByRole("heading", { name: "AI 团队", level: 1 }),
+      screen.getByRole("button", { name: `查看 AI 团队 ${design.title}` }),
     ).toBeVisible();
   });
 });
@@ -472,7 +487,7 @@ describe("AI 团队中心主流程", () => {
         throw new Error("模型服务暂不可用，请重试");
       return fallback(path, options);
     });
-    await user.click(screen.getByRole("button", { name: /新建AI 团队/ }));
+    await user.click(screen.getByRole("button", { name: "新建AI团队" }));
     await user.type(
       screen.getByLabelText("描述AI 团队目标"),
       "训练并评估一个模型",
