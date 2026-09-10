@@ -75,6 +75,8 @@ class AgentRuns:
         self.connection_factory = CodexConnection
 
     def rows(self, db, project, run_id):
+        from .service import get_design
+        get_design(db, project)
         run = db.get(AgentRun, run_id)
         task = db.get(AgentTask, run.task_id) if run else None
         if not task or task.project_id != project:

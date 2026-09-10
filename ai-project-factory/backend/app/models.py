@@ -29,6 +29,13 @@ class Design(Base):
     updated_at: Mapped[str] = mapped_column(String, default=now)
 
 
+class DeletedTeam(Base):
+    """Recoverable deletion without altering existing workspace tables or files."""
+    __tablename__ = 'deleted_teams'
+    design_id: Mapped[str] = mapped_column(ForeignKey('designs.id'), primary_key=True)
+    deleted_at: Mapped[str] = mapped_column(String, default=now)
+
+
 class Message(Base):
     __tablename__ = "messages"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)

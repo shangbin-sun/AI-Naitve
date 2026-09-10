@@ -5,13 +5,13 @@ from pathlib import PurePosixPath
 from fastapi import HTTPException
 from sqlalchemy import select, update
 
-from .models import Design, Employee, Project, Revision, now
+from .models import Design, DeletedTeam, Employee, Project, Revision, now
 from .schemas import Draft, EditEmployee
 
 
 def get_design(db, identity):
     row = db.get(Design, identity)
-    if not row:
+    if not row or db.get(DeletedTeam, identity):
         raise HTTPException(404, "AI 团队不存在")
     return row
 

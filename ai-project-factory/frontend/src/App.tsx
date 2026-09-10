@@ -1,4 +1,5 @@
 import EmployeeWorkflow from "./workflow/EmployeeWorkflow";
+import TeamContextMenu from "./TeamContextMenu";
 import {
   lazy,
   Suspense,
@@ -483,13 +484,32 @@ export default function FactoryApp() {
           </div>
           <div className="sidebar-team-list">
             {designs.map((team) => (
-              <div key={team.id}><button title={team.title}
+              <div key={team.id}>
+              <TeamContextMenu team={team}
+                onRenamed={updated => {
+                  setDesigns(items => items.map(item => item.id === updated.id ? updated : item));
+                  setDesign(current => current?.id === updated.id ? { ...current, ...updated } : current);
+                }}
+                onDeleted={() => {
+                  setDesigns(items => items.filter(item => item.id !== team.id));
+                  setEmployees(items => items.filter(item => item.design_id !== team.id));
+                  setEmployeeChats(items => items.filter(item => item.projectId !== team.id));
+                  if (activeRef.current === team.id) {
+                    activeRef.current = null;
+                    setDesign(null); setEditor(null); setRaw(null); setFilesOpen(false);
+                    editorDirty.current = false; setText(""); setSyncError("");
+                    navigate("projects", null);
+                  }
+                }}
+                onRestored={() => { void refreshLists().catch(e => setError(e.message)); }}>
+              <button title={team.title}
                 aria-label={`进入 AI 团队 ${team.title}`}
                 aria-current={active === team.id ? "page" : undefined}
                 className={`sidebar-team-item ${active === team.id && !currentChat ? "selected" : ""}`}
                 onClick={() => navigate("design", team.id, teamLocations.current.get(team.id) ?? (team.id === active ? projectTab : "conversation"))}>
                 <TeamOutlined /><span>{team.title}</span>
               </button>
+              </TeamContextMenu>
               {employeeChats.some(c=>c.projectId===team.id)&&<div className="sidebar-employee-chats">
                 {employeeChats.filter(c=>c.projectId===team.id).map(c=><div key={chatKey(c)} className={`sidebar-employee-chat ${currentChat===c?"selected":""}`}><button onClick={()=>openEmployeeChat(c)} title={c.name}><RobotOutlined/><span>{c.name}</span></button><button aria-label={`关闭${c.name}对话`} title="关闭对话" onClick={()=>closeEmployeeChat(c)}>×</button></div>)}
               </div>}

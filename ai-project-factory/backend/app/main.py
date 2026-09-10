@@ -31,6 +31,8 @@ from .workspaces import Workspaces
 from .dashboards import DashboardService, install_dashboards
 from .agent_runs import AgentRuns, install_agent_runs
 from .workspace_browser import install_workspace_browser
+from .models import DeletedTeam, Evaluation, now
+from .agent_models import AgentTask, AgentRun
 
 
 def record(row):
@@ -45,6 +47,11 @@ class NewDesign(BaseModel):
 class BrowserTiming(BaseModel):
     event: Literal['first_reply_received', 'frame_after_reply']
     elapsed_ms: float = Field(ge=0, le=3_600_000, allow_inf_nan=False)
+
+
+class RenameTeam(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    expected_version: int = Field(ge=0)
 
 
 
@@ -119,7 +126,57 @@ def create_app(settings=None, runtime=None):
     @app.get("/api/designs", include_in_schema=False)
     def designs():
         with sessions() as db:
-            return [record(d) for d in db.scalars(select(Design).order_by(Design.updated_at.desc()))]
+            return [record(d) for d in db.scalars(select(Design).where(Design.id.not_in(select(DeletedTeam.design_id))).order_by(Design.updated_at.desc()))]
+
+    def require_idle(db, identity):
+        active = ('queued', 'running')
+        if (db.scalar(select(Job.id).where(Job.design_id == identity, Job.status.in_(active)).limit(1))
+            or db.scalar(select(Evaluation.id).where(Evaluation.design_id == identity, Evaluation.status.in_(active)).limit(1))
+            or db.scalar(select(AgentRun.id).join(AgentTask).where(AgentTask.project_id == identity, AgentRun.status.in_(active)).limit(1))):
+            raise HTTPException(409, '团队正在执行任务，请等待结束或停止运行后再操作')
+
+    @app.patch('/api/workspaces/{identity}')
+    async def rename_team(identity: str, data: RenameTeam):
+        title = data.title.strip()
+        if not title:
+            raise HTTPException(422, '团队名称不能为空')
+        async with manager.lock:
+            with sessions.begin() as db:
+                row = get_design(db, identity)
+                require_idle(db, identity)
+                if row.version != data.expected_version:
+                    raise HTTPException(409, '团队已发生变化，请刷新后重试')
+                if row.draft.get('name'):
+                    row = apply_draft(db, identity, data.expected_version, {**row.draft, 'name': title}, 'rename')
+                else:
+                    row.title, row.updated_at = title, now()
+                    row.version += 1
+                result = record(row)
+            workspaces.snapshot(identity)
+        return result
+
+    @app.delete('/api/workspaces/{identity}')
+    async def delete_team(identity: str):
+        async with manager.lock:
+            with sessions.begin() as db:
+                if db.get(DeletedTeam, identity):
+                    return {'id': identity, 'deleted': True}
+                get_design(db, identity)
+                require_idle(db, identity)
+                db.add(DeletedTeam(design_id=identity))
+        return {'id': identity, 'deleted': True}
+
+    @app.post('/api/workspaces/{identity}/restore')
+    async def restore_team(identity: str):
+        async with manager.lock:
+            with sessions.begin() as db:
+                row = db.get(Design, identity)
+                if not row:
+                    raise HTTPException(404, 'AI 团队不存在')
+                deleted = db.get(DeletedTeam, identity)
+                if deleted:
+                    db.delete(deleted)
+                return record(row)
 
     @app.post("/api/workspaces", status_code=201)
     @app.post("/api/designs", status_code=201, include_in_schema=False)
@@ -283,7 +340,7 @@ def create_app(settings=None, runtime=None):
     @app.get("/api/employees")
     def employees():
         with sessions() as db:
-            return [record(e) for e in db.scalars(select(Employee).where(Employee.active.is_(True)).order_by(Employee.updated_at.desc()))]
+            return [record(e) for e in db.scalars(select(Employee).where(Employee.active.is_(True), Employee.design_id.not_in(select(DeletedTeam.design_id))).order_by(Employee.updated_at.desc()))]
 
     @app.get("/api/employees/{identity}")
     def employee(identity: str):
@@ -339,7 +396,7 @@ def create_app(settings=None, runtime=None):
     @app.get("/api/projects", include_in_schema=False)
     def projects():
         with sessions() as db:
-            return [record(p) for p in db.scalars(select(Project).order_by(Project.created_at.desc()))]
+            return [record(p) for p in db.scalars(select(Project).where(Project.design_id.not_in(select(DeletedTeam.design_id))).order_by(Project.created_at.desc()))]
 
     return app
 
