@@ -90,10 +90,13 @@ def wait(client, identity):
 def test_exact_incremental_input_restart_and_separate_plan(tmp_path):
     settings, value, connection = runtime(tmp_path)
     with TestClient(create_app(settings, value)) as client:
-        identity = client.post('/api/workspaces', json={'title': '项目'}).json()['id']
+        identity = client.post('/api/workspaces', json={'title': 'AI 团队'}).json()['id']
         client.post(f'/api/workspaces/{identity}/messages', json={'content': '  第一条\n原样  ', 'request_id': 'one', 'expected_version': 0})
         first = wait(client, identity)
         thread = first['codex_conversation']['thread_id']
+        from pathlib import Path
+        started = next(p for method,p in connection.calls if method == 'thread/start')
+        assert Path(started['cwd']).name == identity
         assert first['draft'] == {} and first['version'] == 0
         client.post(f'/api/workspaces/{identity}/messages', json={'content': '第二条', 'request_id': 'two', 'expected_version': 0})
         second = wait(client, identity)
@@ -127,7 +130,7 @@ def test_legacy_import_once_and_new_images_only(tmp_path):
     settings, value, connection = runtime(tmp_path)
     app = create_app(settings, value)
     with TestClient(app) as client:
-        identity = client.post('/api/workspaces', json={'title': '旧项目'}).json()['id']
+        identity = client.post('/api/workspaces', json={'title': '旧AI 团队'}).json()['id']
         with app.state.sessions.begin() as db:
             db.add(Message(design_id=identity, role='user', content='旧历史'))
             db.add(Message(design_id=identity, role='assistant', content='旧回复'))
@@ -164,8 +167,12 @@ def test_markdown_and_image_reach_separate_codex_inputs(tmp_path):
         inputs = next(params['input'] for method, params in connection.calls if method == 'turn/start')
         images = [item for item in inputs if item['type'] == 'image']
         assert len(images) == 1 and images[0]['url'].startswith('data:image/png;base64,')
-        documents = [item['text'] for item in inputs if item['type'] == 'text' and 'MD-4827' in item['text']]
+        documents = [item['text'] for item in inputs if item['type'] == 'text' and '本轮用户附件' in item['text']]
         assert len(documents) == 1 and '整理日志.md' in documents[0]
+        from pathlib import Path
+        reference = json.loads(documents[0].split('】', 1)[1])
+        assert 'MD-4827' in Path(reference['path']).read_text()
+        assert not any('MD-4827' in item.get('text', '') for item in inputs)
         client.post(f'/api/workspaces/{identity}/messages', json={'content': '继续', 'request_id': 'next', 'expected_version': 0})
         wait(client, identity)
         latest = [params['input'] for method, params in connection.calls if method == 'turn/start'][-1]
@@ -203,7 +210,7 @@ def test_cancellation_isolated_compaction_events_and_missing_resume(tmp_path):
 def test_employee_reference_is_separate_from_user_text_and_mcp_is_project_scoped(tmp_path):
     settings, value, connection = runtime(tmp_path)
     with TestClient(create_app(settings, value)) as client:
-        project = client.post('/api/workspaces', json={'title': '项目'}).json()['id']
+        project = client.post('/api/workspaces', json={'title': 'AI 团队'}).json()['id']
         client.put(f'/api/workspaces/{project}/draft', json={'expected_version':0, 'draft':DRAFT})
         employee = client.get(f'/api/workspaces/{project}').json()['employees'][0]
         client.post(f'/api/workspaces/{project}/messages', json={'content':'优化输出', 'employee_id':employee['id'], 'request_id':'ref', 'expected_version':1})

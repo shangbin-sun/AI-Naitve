@@ -31,7 +31,7 @@ it("提交到平台构建接口并刷新运行记录", async () => {
 });
 it("失败后保留目标并显示接口错误", async () => {
   vi.mocked(api).mockImplementation(async () => {
-    throw new Error("当前项目已有运行进行中");
+    throw new Error("当前AI 团队已有运行进行中");
   });
   render(
     <EmployeeBuildPanel projectId="p1" disabled={false} onStarted={vi.fn()} />,
@@ -41,6 +41,6 @@ it("失败后保留目标并显示接口错误", async () => {
   await userEvent.click(
     screen.getByRole("button", { name: "自动开发并验证员工" }),
   );
-  expect(await screen.findByText("当前项目已有运行进行中")).toBeInTheDocument();
+  expect(await screen.findByText("当前AI 团队已有运行进行中")).toBeInTheDocument();
   expect(input).toHaveValue(before);
 });

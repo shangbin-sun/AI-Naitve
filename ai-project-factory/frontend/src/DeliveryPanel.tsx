@@ -120,7 +120,7 @@ export default function DeliveryPanel({
   onStarted: () => Promise<void>;
 }) {
   const [goal, setGoal] = useState(
-    "基于项目原有测试样例明确要求，分析架构和构建失败，自动修复源码副本并重新执行所有原测试。不得修改参考测试、减少模块或伪造成功。",
+    "基于AI 团队原有测试样例明确要求，分析架构和构建失败，自动修复源码副本并重新执行所有原测试。不得修改参考测试、减少模块或伪造成功。",
   );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -141,17 +141,17 @@ export default function DeliveryPanel({
   }
   return (
     <section className="source-import">
-      <h3>让项目按原有样例自动开发</h3>
+      <h3>让AI 团队按原有样例自动开发</h3>
       <p>
         冻结源码测试 → 执行基线 → Codex 分析需求与架构 → 开发修复 → 原测试回归 →
         质量对比。每轮保留证据。
       </p>
       <Alert
         type="info"
-        message="当前支持 Gradle/JUnit 源码项目，允许下载构建依赖；在副本运行，部署不在本轮验证范围。"
+        message="当前支持 Gradle/JUnit 源码AI 团队，允许下载构建依赖；在副本运行，部署不在本轮验证范围。"
       />
       <Input.TextArea
-        aria-label="项目自动开发任务说明"
+        aria-label="AI 团队自动开发任务说明"
         rows={4}
         value={goal}
         onChange={(e) => setGoal(e.target.value)}
@@ -163,7 +163,7 @@ export default function DeliveryPanel({
         loading={busy}
         onClick={() => void start()}
       >
-        启动项目自动开发与样例验证
+        启动AI 团队自动开发与样例验证
       </Button>
     </section>
   );

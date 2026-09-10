@@ -213,7 +213,7 @@ def test_project_employee_export_uses_saved_version(workspace):
 
 def test_workspace_exists_before_generation_and_preserves_goal(workspace):
     client, _ = workspace
-    result = client.post('/api/workspaces', json={'title': '训练实验项目', 'goal': '准备数据、训练并独立评估'})
+    result = client.post('/api/workspaces', json={'title': '训练实验AI 团队', 'goal': '准备数据、训练并独立评估'})
     assert result.status_code == 201
     identity = result.json()['id']
     saved = client.get(f'/api/workspaces/{identity}').json()
@@ -229,10 +229,10 @@ def test_workspace_identity_survives_employee_edits_and_snapshots(workspace):
     other = new(client, ready=True)
     snapshot = client.post(f'/api/workspaces/{identity}/snapshots', json={'expected_version': 1}).json()
     employee = client.get(f'/api/workspaces/{identity}').json()['employees'][0]
-    profile = {**employee['profile'], 'name': '本项目专用分析师'}
+    profile = {**employee['profile'], 'name': '本AI 团队专用分析师'}
     assert client.put(f"/api/employees/{employee['id']}", json={'expected_version': employee['version'], 'profile': profile, 'files': employee['files']}).status_code == 200
     current = client.get(f'/api/workspaces/{identity}').json()
-    assert current['draft']['members'][0]['name'] == '本项目专用分析师'
+    assert current['draft']['members'][0]['name'] == '本AI 团队专用分析师'
     assert current['version'] == 2
     assert len(client.get('/api/workspaces').json()) == 2
     assert client.get(f'/api/workspaces/{other}').json()['draft']['members'][0]['name'] == '分析员'

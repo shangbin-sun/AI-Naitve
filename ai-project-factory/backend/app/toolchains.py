@@ -69,7 +69,7 @@ async def ensure_toolchains(data_dir, source, offline, log):
     versions=sorted(versions)
     records=[]
     for version in versions:
-        if version not in {17,21}:raise RuntimeError(f'项目要求JDK {version}，尚未支持自动安装')
+        if version not in {17,21}:raise RuntimeError(f'AI 团队要求JDK {version}，尚未支持自动安装')
         cache=data_dir/'toolchains'
         if offline and not (cache/f'jdk-{version}/ready.json').exists():
             await log(f'离线模式未配置JDK {version}，交给构建报告真实环境状态');continue

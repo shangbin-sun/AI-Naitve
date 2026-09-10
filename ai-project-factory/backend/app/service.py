@@ -12,12 +12,14 @@ from .schemas import Draft, EditEmployee
 def get_design(db, identity):
     row = db.get(Design, identity)
     if not row:
-        raise HTTPException(404, "项目不存在")
+        raise HTTPException(404, "AI 团队不存在")
     return row
 
 
 def scaffold(profile):
+    from .organization import default_files
     return {
+        **default_files("employee"),
         "instructions/role.md": profile["instructions"],
         "README.md": f"# {profile['name']}\n\n{profile['role']}\n\n这是自动生成的员工工程草稿，请完善工具、环境并评测后使用。\n",
         "evaluations/example.json": json.dumps({"input": profile["inputs"], "expected_outputs": profile["outputs"]}, ensure_ascii=False, indent=2),
@@ -100,7 +102,7 @@ def edit_employee(db, identity, data: EditEmployee):
 def instantiate(db, identity, expected):
     design = get_design(db, identity)
     if design.version != expected:
-        raise HTTPException(409, "团队已更新，请刷新后创建项目")
+        raise HTTPException(409, "团队已更新，请刷新后创建AI 团队")
     if not design.draft.get("ready"):
         raise HTTPException(422, "请先通过聊天明确目标、岗位和工作流程")
     existing = db.scalar(select(Project).where(Project.design_id == identity, Project.design_version == expected))

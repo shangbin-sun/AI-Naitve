@@ -33,7 +33,7 @@ export default function EmployeeTrial({
     <details className="source-form">
       <summary>给员工新输入并试运行</summary>
       <p>
-        使用员工当前保存版本，输入结构见上方工程与样例。执行结果保存到项目运行记录；没有预期答案的试运行不计为验收通过。
+        使用员工当前保存版本，输入结构见上方工程与样例。执行结果保存到AI 团队运行记录；没有预期答案的试运行不计为验收通过。
       </p>
       <Input.TextArea
         aria-label="员工试运行JSON输入"

@@ -18,6 +18,31 @@ import OutputChain from "./EmployeeOutputChain";
 import { DeliveryResults } from "../DeliveryPanel";
 import type { TaskDefinition, TaskRun, TaskSource, WorkTask } from "./types";
 import "./tasks.css";
+import AgentRunsPanel from "./AgentRunsPanel";
+
+export default function TasksPanel(props: {
+  projectId: string;
+  onSources: () => void;
+}) {
+  return (
+    <Tabs
+      items={[
+        {
+          key: "agents",
+          label: "智能体任务",
+          children: (
+            <AgentRunsPanel key={props.projectId} projectId={props.projectId} />
+          ),
+        },
+        {
+          key: "code",
+          label: "代码交付与历史记录",
+          children: <LegacyTasksPanel {...props} />,
+        },
+      ]}
+    />
+  );
+}
 const statuses: Record<string, string> = {
   queued: "等待执行",
   running: "执行中",
@@ -164,7 +189,7 @@ function RunDetails({
   );
 }
 
-export default function TasksPanel({
+export function LegacyTasksPanel({
   projectId,
   onSources,
 }: {
@@ -465,7 +490,7 @@ export default function TasksPanel({
               />
             )}
             {projectBusy && (
-              <p>当前项目正在执行任务，请等待结束或停止后再启动下一轮。</p>
+              <p>当前AI 团队正在执行任务，请等待结束或停止后再启动下一轮。</p>
             )}
             {run?.inputs.task_snapshot &&
               run.inputs.task_snapshot.version < detail.version && (

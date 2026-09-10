@@ -37,7 +37,7 @@ class Requirement(Strict):
 
 
 class HumanRouting(Strict):
-    default_owner: str | None = Field(default=None, description="默认接收所有AI升级问题的人类成员key；null沿用首个人类成员，无人类时使用内置项目负责人。@project_owner表示内置负责人。")
+    default_owner: str | None = Field(default=None, description="默认接收所有AI升级问题的人类成员key；null沿用首个人类成员，无人类时使用内置AI 团队负责人。@project_owner表示内置负责人。")
     assignments: dict[str, str] = Field(default_factory=dict, description="按AI成员key指定专属人类接收人key，例如需求AI交给需求人类、架构AI交给架构人类；未指定走默认负责人。")
 
 
@@ -70,10 +70,10 @@ class Draft(Strict):
             human_keys = {m.key for m in self.members if m.kind == 'human'} | {'@project_owner'}
             ai_keys = {m.key for m in self.members if m.kind == 'ai'}
             if self.human_routing.default_owner and self.human_routing.default_owner not in human_keys:
-                raise ValueError('默认问题接收人必须是本项目的人类员工')
+                raise ValueError('默认问题接收人必须是本AI 团队的人类员工')
             for ai, human in self.human_routing.assignments.items():
                 if ai not in ai_keys or human not in human_keys:
-                    raise ValueError('人工分工必须从本项目AI员工指向人类员工')
+                    raise ValueError('人工分工必须从本AI 团队AI员工指向人类员工')
         graph = {s.key: s.depends_on for s in self.workflow}
         for step in self.workflow:
             if step.owner not in members:

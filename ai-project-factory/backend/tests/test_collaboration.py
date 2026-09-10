@@ -14,7 +14,7 @@ def test_legacy_draft_remains_unchanged_and_has_default_human():
     draft['workflow'] = draft['workflow'][:1]
     support = human_support(draft)
     assert support['default_owner']=='@project_owner'
-    assert support['humans'][0]['name']=='项目负责人（你）'
+    assert support['humans'][0]['name']=='AI 团队负责人（你）'
     assert len(draft['members'])==1
 
 

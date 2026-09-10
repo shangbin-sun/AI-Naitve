@@ -27,7 +27,7 @@ export function employeeGraph(draft: Draft) {
   ) {
     humans.unshift({
       key: DEFAULT_HUMAN,
-      name: "项目负责人（你）",
+      name: "AI 团队负责人（你）",
       kind: "human",
       role: "处理需要人工判断、补充信息或确认的问题",
       responsibilities: [],
@@ -264,7 +264,7 @@ export default function EmployeeWorkflow({
                   onClick={() => {
                     setSelected(null);
                     if (human.key !== DEFAULT_HUMAN) onEmployee?.(human);
-                    else onQuestion?.("请帮我调整项目负责人及人工分工。");
+                    else onQuestion?.("请帮我调整AI 团队负责人及人工分工。");
                   }}
                 >
                   <span className="workflow-node-type">
@@ -382,7 +382,7 @@ export default function EmployeeWorkflow({
             </div>
             {!graph.ai.length && (
               <p className="workflow-canvas-empty">
-                告诉项目助手你的目标，即可生成协作的 AI 员工。
+                告诉AI 团队助手你的目标，即可生成协作的 AI 员工。
               </p>
             )}
           </div>
@@ -411,7 +411,7 @@ export default function EmployeeWorkflow({
               收起
             </button>
           </div>
-          {endpoint === "@input" && <p>项目目标：{draft.goal}</p>}
+          {endpoint === "@input" && <p>AI 团队目标：{draft.goal}</p>}
           {endpointItems.length ? (
             endpointItems.map((item, index) => <p key={index}>{item}</p>)
           ) : (

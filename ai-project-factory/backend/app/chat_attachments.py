@@ -48,7 +48,7 @@ def bind_attachments(db, identity, message_id, ids):
     for attachment_id in ids:
         row = db.get(ChatAttachment, attachment_id)
         if not row or row.design_id != identity or row.message_id is not None:
-            raise HTTPException(422, "附件不存在、属于其他项目或已用于另一条消息，请重新上传")
+            raise HTTPException(422, "附件不存在、属于其他AI 团队或已用于另一条消息，请重新上传")
         row.message_id = message_id
 
 

@@ -81,6 +81,22 @@ def test_team_creation_and_reference_scope(tools_workspace):
     assert response.status_code==404
 
 
+def test_native_run_tools_are_project_scoped_and_idempotent(tools_workspace):
+    client, app, project, employee, call, job_id = tools_workspace
+    launched = []
+    app.state.agent_runs.launch = lambda project, run_id: launched.append(run_id)
+    args = dict(title='节点测试', description='验证输出', node='analyze', request_id='native')
+    result = call('run_task', **args)
+    assert result.status_code == 200, result.text
+    run = result.json()
+    assert call('run_task', **args).json()['id'] == run['id']
+    assert call('run_task', **{**args,'description':'不同输入'}).status_code == 409
+    assert call('get_run', run_id=run['id']).json()['scope'] == 'node'
+    assert call('list_runs', employee_id=employee['id']).json()[0]['id'] == run['id']
+    with app.state.sessions.begin() as db: db.get(Job, job_id).status = 'cancelled'
+    assert call('run_task', **{**args, 'request_id':'late'}).status_code == 409
+
+
 def test_mcp_preserves_json_strings(monkeypatch):
     import asyncio
     from app import project_mcp

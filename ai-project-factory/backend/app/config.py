@@ -14,6 +14,7 @@ class Settings:
     codex_reasoning_effort: str = "medium"
     chat_reasoning_effort: str = "medium"
     chat_lean_context: bool = True
+    run_timeout_seconds: int = 1800
 
     @classmethod
     def from_env(cls):
@@ -32,4 +33,5 @@ class Settings:
             codex_reasoning_effort=os.getenv("CODEX_REASONING_EFFORT", "medium"),
             chat_reasoning_effort=os.getenv("CODEX_CHAT_REASONING_EFFORT", os.getenv("CODEX_REASONING_EFFORT", "medium")),
             chat_lean_context=os.getenv("FACTORY_CHAT_LEAN_CONTEXT", "1") != "0",
+            run_timeout_seconds=int(os.getenv('CODEX_RUN_TIMEOUT_SECONDS', '1800')),
         )

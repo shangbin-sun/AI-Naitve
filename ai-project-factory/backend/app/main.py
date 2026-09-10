@@ -27,6 +27,9 @@ from .employee_builder import install_builder
 from .delivery import install_delivery
 from .tasks import install_tasks
 from .chat_attachments import install_chat_attachments, message_attachments, bind_attachments
+from .workspaces import Workspaces
+from .agent_runs import AgentRuns, install_agent_runs
+from .workspace_browser import install_workspace_browser
 
 
 def record(row):
@@ -34,7 +37,7 @@ def record(row):
 
 
 class NewDesign(BaseModel):
-    title: str = Field(default="未命名项目", min_length=1, max_length=200)
+    title: str = Field(default="未命名AI 团队", min_length=1, max_length=200)
     goal: str = Field(default="", max_length=10000)
 
 
@@ -56,17 +59,23 @@ def create_app(settings=None, runtime=None):
     performance = PerformanceLog(settings.data_dir)
     manager = JobManager(sessions, runtime, performance)
     evidence = EvidenceManager(sessions, runtime, settings)
+    workspaces = Workspaces(settings, sessions)
+    agent_runs = AgentRuns(sessions, settings, workspaces)
     project_tools = ProjectTools(sessions, manager, evidence)
+    project_tools.agent_runs = agent_runs
     if isinstance(runtime, CodexRuntime):
         runtime.project_tools = project_tools
+        runtime.workspaces = workspaces
 
     @asynccontextmanager
     async def lifespan(app):
         manager.recover()
         evidence.recover()
+        agent_runs.recover()
         yield
         await manager.shutdown()
         await evidence.shutdown()
+        await agent_runs.shutdown()
         engine.dispose()
         performance.close()
 
@@ -75,6 +84,9 @@ def create_app(settings=None, runtime=None):
     app.state.manager = manager
     app.state.evidence = evidence
     app.state.project_tools = project_tools
+    app.state.agent_runs = agent_runs
+    install_agent_runs(app, agent_runs)
+    install_workspace_browser(app, workspaces, agent_runs)
     install_project_tools(app, project_tools)
     install_evidence(app, evidence)
     install_builder(app, evidence)
@@ -112,7 +124,11 @@ def create_app(settings=None, runtime=None):
             row = Design(title=data.title, draft={"goal": data.goal} if data.goal else {})
             db.add(row)
             db.flush()
-            return record(row)
+            from .organization import ensure_project_instructions
+            ensure_project_instructions(db, row.id)
+            result = record(row)
+        workspaces.snapshot(row.id)
+        return result
 
     @app.get("/api/workspaces/{identity}")
     @app.get("/api/designs/{identity}", include_in_schema=False)
@@ -304,10 +320,10 @@ def create_app(settings=None, runtime=None):
         with sessions() as db:
             project = db.get(Project, identity)
             if not project:
-                raise HTTPException(404, "项目不存在")
+                raise HTTPException(404, "AI 团队不存在")
             employee = next((e for e in project.snapshot["employees"] if e["id"] == employee_id), None)
             if not employee:
-                raise HTTPException(404, "此员工不在该项目快照中")
+                raise HTTPException(404, "此员工不在该AI 团队快照中")
             buffer = io.BytesIO()
             with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr("employee.json", json.dumps({"format_version": 1, "draft_version": employee["version"], "profile": employee["profile"]}, ensure_ascii=False, indent=2))

@@ -42,9 +42,9 @@ class DeliveryPlan(Strict):
     open_questions: list[str]
 
 
-PLAN = '''你是项目工厂内的需求和架构员工。根据任务、源码和原有测试分析执行流程及最小修复方案。
+PLAN = '''你是AI 团队工厂内的需求和架构员工。根据任务、源码和原有测试分析执行流程及最小修复方案。
 当前运行事实以run_manifest为准，历史资料中的节点数、环境和版本不代表当前状态。原有测试是参考样例，不能声明其业务覆盖完整；不能更改测试、降低断言或虚构依赖。明确输入、操作、输出与验收，给开发员工可执行的工作指令。不要调用工具，平台负责实际执行。'''
-REPAIR = '''你是项目工厂内的代码开发员工。平台已经执行原有参考测试，下面是真实失败日志和冻结源码。
+REPAIR = '''你是AI 团队工厂内的代码开发员工。平台已经执行原有参考测试，下面是真实失败日志和冻结源码。
 根据需求/架构/员工指令修复失败，返回完整内容的变更文件清单（只返回需要改动的文件）与变更解释，平台负责写入源码副本并重跑原测试。
 禁止修改/删除测试、跳过测试、排除模块、伪造报告、降低断言或硬编码测试结果。禁止写入凭据或新增外部服务调用。不执行发布部署。缺少真实外部依赖时说明阻塞，不伪造依赖。
 配置阶段读取发布凭据的错误应修为仅真正发布需要凭据，保留发布的凭据校验。不删除发布功能。保留原有功能与模块。
@@ -90,7 +90,7 @@ def code_context(root):
 def apply_patch_files(root, files, frozen):
     validate_files(files)
     for name in files:
-        if name.endswith('settings.gradle.kts'):raise ValueError('本轮禁止改变项目模块清单')
+        if name.endswith('settings.gradle.kts'):raise ValueError('本轮禁止改变AI 团队模块清单')
         if name in frozen or '/src/test/' in '/'+name or not name.endswith(('.java','.kt','.gradle.kts')):
             raise ValueError('开发员工只能修改生产源码或Gradle配置，不能修改参考测试：'+name)
         path=root/name
@@ -230,17 +230,17 @@ def install_delivery(app,manager):
             if duplicate:return task_record(duplicate)
             if task:
                 data=data.model_copy(update={"goal":task.description+"\n验收要求："+task.acceptance})
-            if db.scalar(select(Evaluation.id).where(Evaluation.design_id==identity,Evaluation.status.in_(['queued','running']))):raise HTTPException(409,'项目已有运行进行中')
+            if db.scalar(select(Evaluation.id).where(Evaluation.design_id==identity,Evaluation.status.in_(['queued','running']))):raise HTTPException(409,'AI 团队已有运行进行中')
             sources=manager.context(db,identity)
             if task:sources=[s for s in sources if s["kind"]!="code" or s["id"]==task.code_source_id]
             source=next((s for s in reversed(sources) if s['kind']=='code' and (not task or s['id']==task.code_source_id) and (manager.root/s['id']).is_dir()),None)
-            if not source:raise HTTPException(422,'先导入项目源码与测试样例')
+            if not source:raise HTTPException(422,'先导入AI 团队源码与测试样例')
             if not test_manifest(manager.root/source['id']):raise HTTPException(422,'源码快照没有src/test参考测试')
             resume_workspace=None;previous_plan=None;editor_inputs=None
             if (data.restart_node or data.edits_digest) and (not task or not data.resume_run_id):raise HTTPException(422,'节点运行需要选择本任务的历史运行')
             if data.resume_run_id:
                 prior=db.get(Evaluation,data.resume_run_id)
-                if not prior or prior.design_id!=identity or prior.kind!='delivery' or prior.status not in ['blocked','completed','failed','cancelled','interrupted']:raise HTTPException(422,'请选择同项目已结束的研发记录')
+                if not prior or prior.design_id!=identity or prior.kind!='delivery' or prior.status not in ['blocked','completed','failed','cancelled','interrupted']:raise HTTPException(422,'请选择同AI 团队已结束的研发记录')
                 if prior.inputs['code_source_id']!=source['id']:
                     old_source=db.get(Source,prior.inputs['code_source_id'])
                     new_source=db.get(Source,source['id'])
@@ -271,7 +271,7 @@ def install_delivery(app,manager):
             row=Evaluation(design_id=identity,design_version=design.version,kind='delivery',inputs={**data.model_dump(),'editor_snapshot':editor_inputs,'resume_workspace':resume_workspace,'previous_plan':previous_plan,
                 'task_snapshot':task_record(task) if task else None,'team_snapshot':[{'id':e.id,'key':e.key,'version':e.version,'profile':copy.deepcopy(e.profile)} for e in db.scalars(select(Employee).where(Employee.design_id==identity,Employee.active.is_(True)))],'workflow_snapshot':copy.deepcopy(design.draft),'project':{'version':design.version,'workflow_nodes':len(design.draft.get('workflow',[]))},'code_source_id':source['id'],'sources':sources,'employees':[{'key':e.key,'version':e.version,'profile':e.profile,'runtime_manifest':e.files.get('runtime.json',''),'instructions':e.files.get('AGENTS.md',e.profile.get('instructions',''))} for e in db.scalars(select(Employee).where(Employee.design_id==identity,Employee.active.is_(True))) if e.key.startswith('it_')]})
             db.add(Message(design_id=identity,role='user',content=data.goal))
-            db.add(Message(design_id=identity,role='assistant',content='已启动原有样例驱动的项目开发流程。平台将保存每轮需求/架构分析、代码修复和参考测试结果；请在资料与评估查看进度。'))
+            db.add(Message(design_id=identity,role='assistant',content='已启动原有样例驱动的AI 团队开发流程。平台将保存每轮需求/架构分析、代码修复和参考测试结果；请在资料与评估查看进度。'))
             db.add(row);db.flush()
             if task:db.add(TaskRun(task_id=task.id,evaluation_id=row.id,request_id=data.task_request_id))
             record={c.name:getattr(row,c.name) for c in row.__table__.columns}
@@ -283,13 +283,13 @@ def install_delivery(app,manager):
     def materialize(identity:str):
         with manager.sessions.begin() as db:
             row=db.get(Evaluation,identity)
-            if not row or row.kind!='delivery':raise HTTPException(404,'项目研发记录不存在')
+            if not row or row.kind!='delivery':raise HTTPException(404,'AI 团队研发记录不存在')
             if row.status not in ['completed','blocked']:raise HTTPException(422,'等待本轮研发完成后保存员工')
             if row.result.get('worker_ids'):return {'worker_ids':row.result['worker_ids']}
             plan=row.result.get('plan')
             if not plan:raise HTTPException(422,'没有员工操作方案')
             design=get_design(db,row.design_id)
-            if design.version!=row.design_version:raise HTTPException(409,'项目版本已变化，保留研发结果，未覆盖员工')
+            if design.version!=row.design_version:raise HTTPException(409,'AI 团队版本已变化，保留研发结果，未覆盖员工')
             draft=copy.deepcopy(design.draft) or {'name':design.title,'goal':row.inputs['goal'],'members':[],'workflow':[],'requirements':[],'assumptions':[],'questions':[],'ready':False}
             specs=[('it_analysis','需求与架构员工','analyze','读取任务、来源和原测试，明确需求、架构约束、疑问和最小改动计划。'),
                    ('it_development','代码开发员工','develop',plan['employee_instructions']),

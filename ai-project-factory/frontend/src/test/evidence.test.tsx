@@ -18,7 +18,7 @@ const source = {
 beforeEach(() => {
   mocked.mockReset();
 });
-describe("项目证据与质量", () => {
+describe("AI 团队证据与质量", () => {
   it("显式选择依赖下载，并调用对应基线执行接口", async () => {
     mocked.mockImplementation(async (path, options) =>
       options?.method === "POST"
@@ -83,7 +83,7 @@ describe("项目证据与质量", () => {
     await user.click(screen.getByText("requirements.md · abc123"));
     expect(screen.getByText("可追溯的部分需求")).toBeVisible();
   });
-  it("显示资料覆盖边界和评估阻塞，并将建议带回项目", async () => {
+  it("显示资料覆盖边界和评估阻塞，并将建议带回AI 团队", async () => {
     mocked.mockImplementation(async (path) =>
       path.endsWith("/sources")
         ? [source]

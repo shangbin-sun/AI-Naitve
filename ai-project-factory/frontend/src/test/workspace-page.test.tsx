@@ -6,8 +6,8 @@ it("keeps the background locked until the last detail page closes, then restores
   document.body.style.overflow = "auto";
   const page = (parent: boolean, child: boolean) => (
     <>
-      <WorkspacePage open={parent} title="项目">
-        项目内容
+      <WorkspacePage open={parent} title="AI 团队">
+        AI 团队内容
       </WorkspacePage>
       <WorkspacePage open={child} title="员工">
         员工内容

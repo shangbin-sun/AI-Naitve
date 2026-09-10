@@ -30,7 +30,6 @@ import {
   FileTextOutlined,
   HistoryOutlined,
   PlusOutlined,
-  ProjectOutlined,
   RobotOutlined,
   SettingOutlined,
   TeamOutlined,
@@ -265,7 +264,7 @@ export default function FactoryApp() {
       });
       await refreshLists();
       setProject(p);
-      message.success("方案快照已保存，可在本项目历史中查看");
+      message.success("方案快照已保存，可在本AI 团队历史中查看");
     } catch (e) {
       message.error((e as Error).message);
     } finally {
@@ -325,7 +324,7 @@ export default function FactoryApp() {
       .then((employee) => {
         if (cancelled) return;
         if (view === "design" && employee.design_id !== active)
-          throw new Error("此员工不属于当前项目");
+          throw new Error("此员工不属于当前AI 团队");
         setEditor(employee);
       })
       .catch((e) => {
@@ -440,15 +439,17 @@ export default function FactoryApp() {
       <aside className="sidebar" onClickCapture={navigateFromPage}>
         <a
           className="brand"
+          href="#/projects"
+          aria-label="返回团队首页"
           onClick={() => {
             navigate("projects", null);
           }}
         >
           <span className="brand-mark">
-            F<span>·</span>
+            A<span>·</span>
           </span>
           <div>
-            AI 项目工厂<small>PROJECT FACTORY</small>
+            AI 工作室<small>AI STUDIO</small>
           </div>
         </a>
         <div className="workspace-label">
@@ -458,23 +459,31 @@ export default function FactoryApp() {
           </div>
           <span className="tiny-dot" />
         </div>
-        <div className="nav-label">工作台</div>
+        <section className="sidebar-teams" aria-label="AI 团队列表">
+          <div className="sidebar-teams-heading">
+            <span>我的 AI 团队</span>
+            <button aria-label="添加团队" title="添加团队" onClick={() => {
+              setText(""); navigate("design", null, "conversation");
+            }}><PlusOutlined /></button>
+          </div>
+          <div className="sidebar-team-list">
+            {designs.map((team) => (
+              <button key={team.id} title={team.title}
+                aria-label={`进入 AI 团队 ${team.title}`}
+                aria-current={active === team.id ? "page" : undefined}
+                className={`sidebar-team-item ${active === team.id ? "selected" : ""}`}
+                onClick={() => navigate("design", team.id, "conversation")}>
+                <TeamOutlined /><span>{team.title}</span>
+              </button>
+            ))}
+            {!designs.length && <p>还没有 AI 团队</p>}
+          </div>
+        </section>
         <nav>
-          {(
-            [
-              ["projects", ProjectOutlined, "项目"],
-              ["employees", RobotOutlined, "员工"],
-            ] as const
-          ).map(([key, Icon, label]) => (
-            <button
-              key={key}
-              className={`nav-item ${key === "employees" ? "secondary-nav" : ""} ${view === key || (view === "design" && key === "projects") ? "selected" : ""}`}
-              onClick={() => navigate(key, null)}
-            >
-              <Icon />
-              {label}
-            </button>
-          ))}
+          <button className={`nav-item secondary-nav ${view === "employees" ? "selected" : ""}`}
+            onClick={() => navigate("employees", null)}>
+            <RobotOutlined />员工
+          </button>
         </nav>
         <div className="runtime-card">
           <span
@@ -508,11 +517,11 @@ export default function FactoryApp() {
           <div>
             <span className="breadcrumb">工作台</span>
             <span className="slash">/</span>
-            {view === "employees" ? "员工" : "项目"}
+            {view === "employees" ? "员工" : "AI 团队"}
             {view === "design" && (
               <>
                 <span className="slash">/</span>
-                {active ? design?.title || "正在加载" : "新建项目"}
+                {active ? design?.title || "正在加载" : "新建AI 团队"}
               </>
             )}
           </div>
@@ -543,18 +552,18 @@ export default function FactoryApp() {
                   从想法，到一起工作的团队
                 </div>
                 <h1>
-                  你的下一个项目，
+                  你的下一个AI 团队，
                   <br />
                   从一场对话开始<span>。</span>
                 </h1>
                 <p className="welcome-description">
                   说说你想完成什么。我们一起梳理角色、工作流程与交付目标，
                   <br className="desktop-break" />
-                  创建项目，在同一个空间里完善团队与方案。
+                  创建AI 团队，在同一个空间里完善团队与方案。
                 </p>
                 <div className="welcome-composer">
                   <Input.TextArea
-                    aria-label="描述项目目标"
+                    aria-label="描述AI 团队目标"
                     autoSize={{ minRows: 3, maxRows: 7 }}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
@@ -585,7 +594,7 @@ export default function FactoryApp() {
                       disabled={!text.trim()}
                       onClick={() => void send()}
                     >
-                      创建项目 <ArrowRightOutlined />
+                      创建AI 团队 <ArrowRightOutlined />
                     </Button>
                   </div>
                 </div>
@@ -605,7 +614,7 @@ export default function FactoryApp() {
                 <div className="how-it-works">
                   {[
                     "聊清目标与分工",
-                    "在项目中完善方案",
+                    "在AI 团队中完善方案",
                     "配置资源，准备执行",
                   ].map((t, i) => (
                     <div key={t}>
@@ -619,7 +628,7 @@ export default function FactoryApp() {
               <div className="loading">
                 {error ? (
                   <>
-                    <p>项目暂时无法打开，请重试或返回项目列表。</p>
+                    <p>AI 团队暂时无法打开，请重试或返回AI 团队列表。</p>
                     <Button
                       onClick={() => {
                         setError("");
@@ -631,13 +640,13 @@ export default function FactoryApp() {
                       重新加载
                     </Button>
                     <Button onClick={() => navigate("projects", null)}>
-                      返回项目
+                      返回AI 团队
                     </Button>
                   </>
                 ) : (
                   <>
                     <Spin />
-                    <p>正在打开项目…</p>
+                    <p>正在打开AI 团队…</p>
                   </>
                 )}
               </div>
@@ -661,7 +670,7 @@ export default function FactoryApp() {
                       icon={<ArrowLeftOutlined />}
                       onClick={() => navigate("projects", null)}
                     >
-                      所有项目
+                      所有AI 团队
                     </Button>
                   </div>
                 </div>
@@ -708,12 +717,12 @@ export default function FactoryApp() {
                 {projectTab === "overview" && (
                   <section className="project-overview">
                     <div className="project-intro">
-                      <span className="section-kicker">项目目标</span>
+                      <span className="section-kicker">AI 团队目标</span>
                       <h2>
                         {design.draft.goal || "通过对话补充你希望交付的成果"}
                       </h2>
                       <p>
-                        对话、团队和工作流保存在这个项目中，修改后无需重新创建项目。
+                        对话、团队和工作流保存在这个AI 团队中，修改后无需重新创建AI 团队。
                       </p>
                       <Button
                         type="primary"
@@ -721,7 +730,7 @@ export default function FactoryApp() {
                           navigate("design", active, "conversation")
                         }
                       >
-                        {design.draft.name ? "继续讨论项目" : "开始完善方案"}
+                        {design.draft.name ? "继续讨论AI 团队" : "开始完善方案"}
                         <ArrowRightOutlined />
                       </Button>
                       {design.draft.name && (
@@ -768,7 +777,7 @@ export default function FactoryApp() {
                       <Alert
                         type="info"
                         showIcon
-                        message="当前可完成项目筹备与员工工程编辑"
+                        message="当前可完成AI 团队筹备与员工工程编辑"
                         description="资料与评估中可运行需求分析、基线测试及员工自动研发；完整工作流调度、端到端和部署执行仍待接入。"
                       />
                     </div>
@@ -826,7 +835,7 @@ export default function FactoryApp() {
                             </button>
                           ))
                       ) : (
-                        <Empty description="尚无固定快照，项目修改会自动保留修订记录" />
+                        <Empty description="尚无固定快照，AI 团队修改会自动保留修订记录" />
                       )}
                     </div>
                   </section>
@@ -843,7 +852,7 @@ export default function FactoryApp() {
                   >
                     <div className="panel-heading">
                       <span>
-                        <span className="assistant-icon">✳</span> 项目助手
+                        <span className="assistant-icon">✳</span> AI 团队助手
                       </span>
                       <div>
                         <small>对话自动保存</small>
@@ -960,7 +969,7 @@ export default function FactoryApp() {
             <div className="library-heading">
               <div className="eyebrow small">EMPLOYEE WORKSHOP</div>
               <h1>员工</h1>
-              <p>集中完善员工指令与工程文件。日常团队协作请进入所属项目。</p>
+              <p>集中完善员工指令与工程文件。日常团队协作请进入所属AI 团队。</p>
             </div>
             {!employees.length ? (
               <Empty description="还没有员工工程">
@@ -970,7 +979,7 @@ export default function FactoryApp() {
                     navigate("design", null, "conversation");
                   }}
                 >
-                  创建项目并生成员工
+                  创建AI 团队并生成员工
                 </Button>
               </Empty>
             ) : (
@@ -990,9 +999,9 @@ export default function FactoryApp() {
                     <h3>{e.profile.name}</h3>
                     <p>{e.profile.role}</p>
                     <span className="employee-project-label">
-                      所属项目 ·{" "}
+                      所属AI 团队 ·{" "}
                       {designs.find((d) => d.id === e.design_id)?.title ||
-                        "项目"}
+                        "AI 团队"}
                     </span>
                     <div className="skill-tags">
                       {e.profile.skills.slice(0, 3).map((s) => (
@@ -1015,9 +1024,9 @@ export default function FactoryApp() {
           <section className="library project-library">
             <div className="project-list-heading">
               <div className="library-heading">
-                <div className="eyebrow small">YOUR PROJECTS</div>
-                <h1>项目</h1>
-                <p>从目标开始，让团队、方案与每一次迭代留在同一个项目里。</p>
+                <div className="eyebrow small">YOUR AI TEAMS</div>
+                <h1>AI 团队</h1>
+                <p>从目标开始，让团队、方案与每一次迭代留在同一个AI 团队里。</p>
               </div>
               <Button
                 type="primary"
@@ -1027,12 +1036,12 @@ export default function FactoryApp() {
                   navigate("design", null, "conversation");
                 }}
               >
-                新建项目
+                新建AI 团队
               </Button>
             </div>
             <Input.Search
               className="project-search"
-              placeholder="搜索项目名称或目标"
+              placeholder="搜索AI 团队名称或目标"
               allowClear
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -1042,7 +1051,7 @@ export default function FactoryApp() {
                 <Button
                   onClick={() => navigate("design", null, "conversation")}
                 >
-                  创建第一个项目
+                  创建第一个AI 团队
                 </Button>
               </Empty>
             ) : (
@@ -1056,6 +1065,7 @@ export default function FactoryApp() {
                   .map((d) => (
                     <button
                       className="employee-card project-card"
+                      aria-label={`查看 AI 团队 ${d.title}`}
                       key={d.id}
                       onClick={() => {
                         setText("");
@@ -1063,16 +1073,16 @@ export default function FactoryApp() {
                       }}
                     >
                       <div className="card-top">
-                        <ProjectOutlined className="project-icon" />
+                        <TeamOutlined className="project-icon" />
                         <Tag>{d.draft.ready ? "方案已形成" : "筹备中"}</Tag>
                       </div>
                       <h3>{d.title}</h3>
-                      <p>{d.draft.goal || "进入项目，继续完善目标与团队"}</p>
+                      <p>{d.draft.goal || "进入AI 团队，继续完善目标与团队"}</p>
                       <div className="card-footer">
                         {d.draft.members?.length || 0} 个岗位 ·{" "}
                         {d.draft.workflow?.length || 0} 项工作
                         <span>
-                          打开项目 <ArrowRightOutlined />
+                          打开AI 团队 <ArrowRightOutlined />
                         </span>
                       </div>
                     </button>
@@ -1084,7 +1094,7 @@ export default function FactoryApp() {
                 `${d.title} ${d.draft.goal || ""}`
                   .toLowerCase()
                   .includes(search.toLowerCase()),
-              ) && <Empty className="spaced" description="没有匹配的项目" />}
+              ) && <Empty className="spaced" description="没有匹配的AI 团队" />}
           </section>
         )}
       </main>
@@ -1117,7 +1127,7 @@ export default function FactoryApp() {
         />
       )}
       <WorkspacePage
-        title="编辑项目方案"
+        title="编辑AI 团队方案"
         open={raw !== null}
         onCancel={() => setRaw(null)}
         okText="保存草稿"
@@ -1186,7 +1196,7 @@ export default function FactoryApp() {
               type="success"
               showIcon
               message={`已保存团队修订 ${project.design_version} 的独立快照`}
-              description="后续修改本项目的方案和员工，不会改变这个历史快照。"
+              description="后续修改本AI 团队的方案和员工，不会改变这个历史快照。"
             />
             <ProjectDetails
               project={project}
@@ -1222,9 +1232,9 @@ export function ProjectDetails({
   return (
     <>
       <div className="project-next-step">
-        <p>这是本项目的历史方案。点击岗位查看当时的职责、指令与工程文件。</p>
+        <p>这是本AI 团队的历史方案。点击岗位查看当时的职责、指令与工程文件。</p>
         <Button icon={<EditOutlined />} onClick={() => onEditTeam()}>
-          返回当前项目方案
+          返回当前AI 团队方案
         </Button>
       </div>
       <WorkflowPreview
@@ -1240,7 +1250,7 @@ export function ProjectDetails({
         onQuestion={(q) => onEditTeam(q)}
       />
       <WorkspacePage
-        title={member ? `${member.name} · 项目内详情` : "员工详情"}
+        title={member ? `${member.name} · AI 团队内详情` : "员工详情"}
         open={!!member}
         onClose={() => setMember(null)}
         destroyOnHidden
@@ -1250,8 +1260,8 @@ export function ProjectDetails({
             <Alert
               type="info"
               showIcon
-              message={`项目快照 · 团队修订 ${project.design_version}${saved ? ` · 员工版本 ${saved.version}` : " · 人类岗位"}`}
-              description="这里展示保存快照时的内容。编辑当前项目不会改变此历史版本。"
+              message={`AI 团队快照 · 团队修订 ${project.design_version}${saved ? ` · 员工版本 ${saved.version}` : " · 人类岗位"}`}
+              description="这里展示保存快照时的内容。编辑当前AI 团队不会改变此历史版本。"
             />
             <Tabs
               items={[
@@ -1292,7 +1302,7 @@ export function ProjectDetails({
                   ? [
                       {
                         key: "files",
-                        label: "项目工程文件",
+                        label: "AI 团队工程文件",
                         children: (
                           <>
                             <Button
@@ -1318,7 +1328,7 @@ export function ProjectDetails({
                               <div className="file-content">
                                 <div className="file-path">{selectedFile}</div>
                                 <Input.TextArea
-                                  aria-label="项目快照文件内容"
+                                  aria-label="AI 团队快照文件内容"
                                   className="code-editor"
                                   rows={18}
                                   readOnly
@@ -1338,7 +1348,7 @@ export function ProjectDetails({
               icon={<EditOutlined />}
               onClick={() => onEditTeam()}
             >
-              返回当前项目方案
+              返回当前AI 团队方案
             </Button>
           </>
         )}
@@ -1522,7 +1532,7 @@ export function EmployeeEditor({
           {onDiscuss && (
             <Button
               disabled={dirty || saving}
-              title={dirty ? "请先保存当前修改" : "在项目对话中引用此员工"}
+              title={dirty ? "请先保存当前修改" : "在AI 团队对话中引用此员工"}
               onClick={onDiscuss}
             >
               讨论／优化此员工
@@ -1543,8 +1553,8 @@ export function EmployeeEditor({
       <div className="editor-notice">
         <CodeOutlined />
         <span>
-          {projectTitle ? `所属项目：${projectTitle} · ` : ""}
-          保存后更新本项目方案，历史快照保持原版本
+          {projectTitle ? `所属AI 团队：${projectTitle} · ` : ""}
+          保存后更新本AI 团队方案，历史快照保持原版本
         </span>
       </div>
       <Tabs

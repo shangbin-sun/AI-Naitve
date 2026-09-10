@@ -11,6 +11,8 @@ from .models import Design, Employee, Evaluation, Job, ChatOperation, ToolOperat
 from .schemas import EditEmployee, Draft
 from .collaboration import human_support
 from .service import edit_employee, apply_draft, get_design
+from .agent_models import AgentRun, AgentTask
+from .agent_runs import NewAgentTask
 
 
 def record(row):
@@ -27,6 +29,8 @@ class ProjectTools:
         self.sessions, self.manager, self.evidence = sessions, manager, evidence
         self.tokens = {}
         self.active = {}
+        from .feishu_desktop import FeishuDesktop
+        self.feishu = FeishuDesktop()
 
     def token(self, project):
         return self.tokens.setdefault(project, secrets.token_urlsafe(32))
@@ -34,20 +38,43 @@ class ProjectTools:
     def employee(self, db, project, identity):
         row = db.get(Employee, identity)
         if not row or row.design_id != project or not row.active:
-            raise HTTPException(404, '当前项目中不存在该员工')
+            raise HTTPException(404, '当前AI 团队中不存在该员工')
         return row
 
     def run(self, db, project, identity):
         row = db.get(Evaluation, identity)
         if not row or row.design_id != project:
-            raise HTTPException(404, '当前项目中不存在该运行')
+            raise HTTPException(404, '当前AI 团队中不存在该运行')
         return row
 
     async def call(self, project, action, args):
         # Every invocation is tied to an active host job, never to a model-supplied project ID.
         job_id = self.active.get(project)
         if not job_id:
-            raise HTTPException(409, '项目当前没有活动对话')
+            raise HTTPException(409, 'AI 团队当前没有活动对话')
+        if action == 'feishu_desktop':
+            async with self.manager.lock:
+                with self.sessions() as db:
+                    job = db.get(Job, job_id)
+                    operation = db.get(ChatOperation, job_id)
+                    if not job or job.status != 'running' or not operation or operation.mode != 'chat':
+                        raise HTTPException(409, '本轮已停止或不允许工具操作')
+                result = await self.feishu.call(project, **args)
+            await self.manager.log(job_id, '飞书桌面操作：' + str(args.get('action')) + '；结果以实际界面为准')
+            return result
+        if action == 'run_task':
+            async with self.manager.lock:
+                with self.sessions() as db:
+                    job = db.get(Job, job_id)
+                    operation = db.get(ChatOperation, job_id)
+                    if not job or job.status != 'running' or not operation or operation.mode != 'chat':
+                        raise HTTPException(409, '本轮已停止或不允许工具操作')
+                result = self.agent_runs.create(project, NewAgentTask(
+                    title=args['title'], description=args['description'], scope='node' if args.get('node') else 'workflow',
+                    node=args.get('node'), request_id=args['request_id']))
+                if result['status'] == 'queued':
+                    self.agent_runs.launch(project, result['id'])
+                return result
         launch = None
         async with self.manager.lock:
             with self.sessions.begin() as db:
@@ -71,7 +98,7 @@ class ProjectTools:
                 if action == 'get_source':
                     source = db.get(Source, args['source_id'])
                     if not source or source.design_id != project:
-                        raise HTTPException(404, '当前项目中不存在该资料')
+                        raise HTTPException(404, '当前AI 团队中不存在该资料')
                     content = source.content
                     offset = max(0, int(args.get('offset', 0)))
                     return {'id': source.id, 'title': source.title, 'coverage': source.coverage,
@@ -80,14 +107,22 @@ class ProjectTools:
                     employee_id = args.get('employee_id')
                     if employee_id: self.employee(db, project, employee_id)
                     rows = db.scalars(select(Evaluation).where(Evaluation.design_id == project).order_by(Evaluation.created_at.desc())).all()
-                    return [{'id': r.id, 'kind': r.kind, 'status': r.status, 'employee_id': r.inputs.get('employee_id'),
+                    results = [{'id': r.id, 'kind': r.kind, 'status': r.status, 'employee_id': r.inputs.get('employee_id'),
                              'employee_version': r.inputs.get('employee_version'), 'created_at': r.created_at,
                              'scope': r.result.get('scope', '')} for r in rows if not employee_id or r.inputs.get('employee_id') == employee_id][:20]
+                    for task, run in db.execute(select(AgentTask, AgentRun).join(AgentRun).where(AgentTask.project_id == project).order_by(AgentRun.created_at.desc()).limit(20)):
+                        if employee_id and not any(e['id'] == employee_id and e['profile']['key'] in {n['employee']['key'] for n in run.state['nodes'].values()} for e in run.snapshot['definition']['employees'].values()):
+                            continue
+                        results.append({'id':run.id, 'kind':'agent_run', 'scope':task.scope, 'status':run.status, 'created_at':run.created_at})
+                    return sorted(results, key=lambda r:r['created_at'], reverse=True)[:20]
                 if action == 'get_run':
+                    if db.get(AgentRun, args['run_id']):
+                        task, run = self.agent_runs.rows(db, project, args['run_id'])
+                        return self.agent_runs.describe(task, run)
                     run = self.run(db, project, args['run_id'])
                     return {**record(run), 'inputs': {k:v for k,v in run.inputs.items() if k not in ('files', 'sources')}}
                 if action not in ('update_employee', 'apply_team_changes', 'evaluate_employee'):
-                    raise HTTPException(422, '未知项目工具')
+                    raise HTTPException(422, '未知AI 团队工具')
                 request_id = args.get('request_id', '')
                 if not isinstance(request_id, str) or not 1 <= len(request_id) <= 100:
                     raise HTTPException(422, '写操作需要稳定的 request_id')
@@ -100,7 +135,7 @@ class ProjectTools:
                 if action == 'update_employee':
                     employee = self.employee(db, project, args['employee_id'])
                     if design.version != args['expected_project_version']:
-                        raise HTTPException(409, '项目已修改，请重新读取最新配置')
+                        raise HTTPException(409, 'AI 团队已修改，请重新读取最新配置')
                     data = EditEmployee(expected_version=args['expected_version'], profile=args['profile'], files=args['files'])
                     edit_employee(db, employee.id, data)
                     result = {'employee_id': employee.id, 'employee_version': employee.version, 'project_version': design.version,
@@ -123,7 +158,7 @@ class ProjectTools:
                     expected = args.get('expected_json')
                     if expected is not None: json.loads(expected)
                     if db.scalar(select(Evaluation.id).where(Evaluation.design_id == project, Evaluation.status.in_(['queued','running']))):
-                        raise HTTPException(409, '项目已有运行，请等待完成')
+                        raise HTTPException(409, 'AI 团队已有运行，请等待完成')
                     run = Evaluation(design_id=project, design_version=design.version, kind='employee_run', inputs={
                         'employee_id': employee.id, 'employee_version': employee.version, 'files': copy.deepcopy(employee.files),
                         'input_json': input_json, 'expected_json': expected})
@@ -132,7 +167,7 @@ class ProjectTools:
                               'next': '使用 get_run 查询结果，状态结束之前不能宣称测试通过'}
                 db.add(ToolOperation(id=key, design_id=project, job_id=job_id, action=action, fingerprint=fingerprint, result=result))
         if launch: self.evidence.start(launch)
-        await self.manager.log(job_id, f'项目工具：{action} 已完成；' + json.dumps(result, ensure_ascii=False))
+        await self.manager.log(job_id, f'AI 团队工具：{action} 已完成；' + json.dumps(result, ensure_ascii=False))
         return result
 
 
@@ -141,7 +176,7 @@ def install_project_tools(app, tools):
     async def invoke(project: str, payload: ToolRequest, request: Request):
         token = tools.tokens.get(project)
         if not token or not secrets.compare_digest(request.headers.get('x-project-tool-token', ''), token):
-            raise HTTPException(403, '无效项目工具凭据')
+            raise HTTPException(403, '无效AI 团队工具凭据')
         try:
             if payload.action == 'get_run' and payload.arguments.get('wait_seconds'):
                 # Bounded wait for background work, avoiding rapid polling by the model.

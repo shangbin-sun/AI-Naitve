@@ -27,7 +27,7 @@ def stop(*_):
 
 
 if __name__ == '__main__':
-    for port in (8000, 5173, 8787):
+    for port in (8000, 5173):
         with socket.socket() as probe:
             probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
@@ -37,7 +37,6 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     try:
-        children.append(subprocess.Popen([sys.executable, str(ROOT/'scripts/editor.py')], cwd=ROOT, start_new_session=True))
         children.append(subprocess.Popen([str(ROOT/'backend/.venv/bin/python'), '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000'], cwd=ROOT/'backend', start_new_session=True))
         frontend_env = os.environ.copy()
         node22 = Path('/opt/homebrew/opt/node@22/bin')

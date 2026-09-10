@@ -10,7 +10,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from .models import Base, Evaluation, Source, now, uid
 from .schemas import Strict
-from .web_editor import EditorRequest, editor_url
 from .service import get_design
 
 
@@ -72,7 +71,7 @@ def validate_source(db, project_id, source_id):
     if source_id:
         source = db.get(Source, source_id)
         if not source or source.design_id != project_id or source.kind != 'code':
-            raise HTTPException(422, '请选择本项目导入的源码快照')
+            raise HTTPException(422, '请选择本AI 团队导入的源码快照')
 
 
 def prepare_task_run(db, project_id, data):
@@ -178,10 +177,6 @@ def install_tasks(app, manager):
             return {'run_id':run_id, 'nodes':nodes(runs[0], snapshot),
                     'edits_digest':snapshot['digest'],
                     'changes':[{k:v for k,v in c.items() if k != 'content'} for c in snapshot['changes']]}
-
-    @app.post('/api/workspaces/{project_id}/tasks/{task_id}/runs/{run_id}/web-editor')
-    def open_web_editor(project_id: str, task_id: str, run_id: str, data: EditorRequest):
-        return editor_url(output_workspace(project_id, task_id, run_id), data)
 
     @app.put('/api/workspaces/{project_id}/tasks/{task_id}')
     async def edit(project_id: str, task_id: str, data: TaskEdit):

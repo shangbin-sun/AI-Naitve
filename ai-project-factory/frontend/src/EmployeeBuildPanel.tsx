@@ -39,7 +39,7 @@ export default function EmployeeBuildPanel({
       </p>
       <Alert
         type="info"
-        message="当前支持 Python 标准库数据处理员工；从资料派生的样例仍需业务确认，不代表完整 IT 项目验收。"
+        message="当前支持 Python 标准库数据处理员工；从资料派生的样例仍需业务确认，不代表完整 IT AI 团队验收。"
       />
       <Input.TextArea
         aria-label="员工自动开发目标"

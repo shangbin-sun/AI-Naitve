@@ -1,8 +1,9 @@
 import { it, expect, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import ProjectChat from "../chat/ProjectChat";
+vi.mock("../WorkspaceBrowser", () => ({ default: () => null }));
 
-it("逐段显示、重连恢复、完成不重复，并关闭旧项目连接", () => {
+it("逐段显示、重连恢复、完成不重复，并关闭旧AI 团队连接", () => {
   const sources: FakeSource[] = [];
   class FakeSource {
     onmessage: ((e: { data: string }) => void) | null = null;
@@ -127,8 +128,8 @@ it("等待首字与流式输出共用同一行角色和计时，不产生独立�
     );
     const timer = screen.getByLabelText("本次处理耗时");
     expect(timer.parentElement).toHaveClass("factory-chat-author");
-    expect(timer.parentElement).toHaveTextContent("项目助手");
-    expect(screen.getAllByText("✳ 项目助手")).toHaveLength(1);
+    expect(timer.parentElement).toHaveTextContent("AI 团队助手");
+    expect(screen.getAllByText("✳ AI 团队助手")).toHaveLength(1);
     act(() =>
       sources[0].onmessage?.({
         data: JSON.stringify({

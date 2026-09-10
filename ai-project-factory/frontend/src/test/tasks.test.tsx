@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import TasksPanel from "../tasks/TasksPanel";
+import { LegacyTasksPanel as TasksPanel } from "../tasks/TasksPanel";
 import { api } from "../api";
 vi.mock("../api", () => ({ api: vi.fn() }));
+vi.mock("../tasks/AgentRunsPanel", () => ({ default: () => null }));
 const mock = vi.mocked(api);
 const task = {
   id: "t1",
@@ -32,8 +33,11 @@ describe("任务与运行", () => {
     mock.mockRejectedValueOnce(new Error("临时服务异常"));
     render(<TasksPanel projectId="failed" onSources={vi.fn()} />);
     expect(await screen.findByText("临时服务异常")).toBeVisible();
-    await waitFor(() => expect(screen.queryByText("临时服务异常")).not.toBeInTheDocument(), {timeout: 4000});
-    expect(screen.getByRole("button", {name: "开发 Agent1"})).toBeVisible();
+    await waitFor(
+      () => expect(screen.queryByText("临时服务异常")).not.toBeInTheDocument(),
+      { timeout: 4000 },
+    );
+    expect(screen.getByRole("button", { name: "开发 Agent1" })).toBeVisible();
   });
   it("创建独立任务，保存需求与验收要求", async () => {
     render(<TasksPanel projectId="p" onSources={vi.fn()} />);

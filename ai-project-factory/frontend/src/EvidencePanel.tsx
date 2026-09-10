@@ -259,7 +259,7 @@ export default function EvidencePanel({
           aria-label="代码基线目录"
           value={path}
           onChange={(e) => setPath(e.target.value)}
-          placeholder="Agent项目目录下的代码工程路径"
+          placeholder="AgentAI 团队目录下的代码工程路径"
         />
         <Button
           disabled={!path.trim() || working}
@@ -346,7 +346,7 @@ export default function EvidencePanel({
         onStarted={refresh}
       />
       <h3>参考资料 · {sources.length}</h3>
-      {!sources.length && <Empty description="先导入资料，再评估项目与员工" />}
+      {!sources.length && <Empty description="先导入资料，再评估AI 团队与员工" />}
       {sources.map((s) => (
         <article className="source-card" key={s.id}>
           <div>
@@ -381,7 +381,7 @@ export default function EvidencePanel({
         <article className="evaluation-card" key={e.id}>
           <h3>
             {e.kind === "delivery"
-              ? "项目自动开发与原有样例验证"
+              ? "AI 团队自动开发与原有样例验证"
               : e.kind === "employee_run"
                 ? "员工实际试运行"
                 : e.kind === "employee_build"
@@ -456,7 +456,7 @@ export default function EvidencePanel({
                       body: JSON.stringify({
                         goal:
                           e.inputs?.goal ||
-                          "继续按原有测试优化项目实现并保留全部参考测试",
+                          "继续按原有测试优化AI 团队实现并保留全部参考测试",
                         max_attempts: 2,
                         offline: false,
                         resume_run_id: e.id,
@@ -605,7 +605,7 @@ export default function EvidencePanel({
                 disabled={e.design_version !== version || working}
                 onClick={() =>
                   onImprove(
-                    `根据独立评估 ${e.id}（方案版本 ${e.design_version}）优化当前项目与员工。保留岗位key和已有人工修改，不声称运行通过。\n${JSON.stringify(e.result, null, 2).slice(0, 10000)}`,
+                    `根据独立评估 ${e.id}（方案版本 ${e.design_version}）优化当前AI 团队与员工。保留岗位key和已有人工修改，不声称运行通过。\n${JSON.stringify(e.result, null, 2).slice(0, 10000)}`,
                   )
                 }
               >

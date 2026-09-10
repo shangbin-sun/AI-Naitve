@@ -21,6 +21,7 @@ import {
 import { createAttachmentAdapter } from "./attachments";
 import "./chat.css";
 import ProcessingTime from "./ProcessingTime";
+import WorkspaceBrowser from "../WorkspaceBrowser";
 
 import type { ChatMessage } from "./types";
 type Props = {
@@ -111,7 +112,7 @@ function Message() {
   return (
     <MessagePrimitive.Root className={`factory-chat-message ${role}`}>
       <div className="factory-chat-author">
-        <span>{role === "user" ? "你" : "✳ 项目助手"}</span>
+        <span>{role === "user" ? "你" : "✳ AI 团队助手"}</span>
         {role === "assistant" && timing && (
           <ProcessingTime
             startedAt={timing.started_at}
@@ -284,132 +285,138 @@ export default function ProjectChat(props: Props) {
   }, [props.draftText, runtime]);
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ThreadPrimitive.Root className="factory-chat">
-        <ThreadPrimitive.Viewport className="factory-chat-viewport">
-          <ThreadPrimitive.Empty>
-            <div className="factory-chat-empty">
-              <span aria-hidden="true" className="factory-chat-empty-mark">
-                ✳
-              </span>
-              <h2>从一个想法开始</h2>
-              <p>聊聊你想做什么，我们一起把它变成可以执行的项目。</p>
-            </div>
-          </ThreadPrimitive.Empty>
-          <ThreadPrimitive.Messages components={{ Message }} />
-          {props.busy && (
-            <div className="factory-chat-progress" role="status">
-              <Spin size="small" />
-              {reconnecting
-                ? "连接中断，正在重连…"
-                : current?.message || props.status || "正在连接 Codex…"}
-            </div>
-          )}
-          {props.failure && <Alert type="warning" message={props.failure} />}
-        </ThreadPrimitive.Viewport>
-        {error && (
-          <Alert
-            type="error"
-            message={error}
-            closable
-            onClose={() => setError("")}
-          />
-        )}
-        <div className="factory-chat-compose-area">
-          <ComposerPrimitive.Root className="factory-chat-composer">
-            <div className="factory-chat-attachments">
-              <ComposerPrimitive.Attachments
-                components={{ Attachment: PendingAttachment }}
-              />
-            </div>
-            {props.employeeReference && (
-              <div className="factory-chat-reference-picker">
-                <span>
-                  引用员工 ·{" "}
-                  {props.employees?.find(
-                    (employee) => employee.id === props.employeeReference,
-                  )?.profile.name ?? "当前员工"}
+      <div className="conversation-workspace">
+        <ThreadPrimitive.Root className="factory-chat">
+          <ThreadPrimitive.Viewport className="factory-chat-viewport">
+            <ThreadPrimitive.Empty>
+              <div className="factory-chat-empty">
+                <span aria-hidden="true" className="factory-chat-empty-mark">
+                  ✳
                 </span>
-                {props.onReferenceChange && (
-                  <button
-                    type="button"
-                    aria-label="移除员工引用"
-                    disabled={props.busy}
-                    onClick={() => props.onReferenceChange?.("")}
-                  >
-                    ×
-                  </button>
-                )}
+                <h2>从一个想法开始</h2>
+                <p>聊聊你想做什么，我们一起把它变成可以执行的AI 团队。</p>
+              </div>
+            </ThreadPrimitive.Empty>
+            <ThreadPrimitive.Messages components={{ Message }} />
+            {props.busy && (
+              <div className="factory-chat-progress" role="status">
+                <Spin size="small" />
+                {reconnecting
+                  ? "连接中断，正在重连…"
+                  : current?.message || props.status || "正在连接 Codex…"}
               </div>
             )}
-            <ComposerPrimitive.Input
-              aria-label="讨论当前项目"
-              placeholder="直接与 Codex 对话，也可以添加文件或粘贴图片…"
-              minRows={2}
-              maxRows={7}
-              maxLength={12000}
-              disabled={props.busy}
-              cancelOnEscape={false}
+            {props.failure && <Alert type="warning" message={props.failure} />}
+          </ThreadPrimitive.Viewport>
+          {error && (
+            <Alert
+              type="error"
+              message={error}
+              closable
+              onClose={() => setError("")}
             />
-            <div className="factory-chat-actions">
-              <ComposerPrimitive.AddAttachment
-                disabled={props.busy}
-                className="factory-chat-button"
-              >
-                <PictureOutlined aria-hidden="true" /> 添加图片
-              </ComposerPrimitive.AddAttachment>
-              <ComposerPrimitive.AddAttachment
-                disabled={props.busy}
-                className="factory-chat-button"
-              >
-                📎 添加文件
-              </ComposerPrimitive.AddAttachment>
-              <span className="factory-chat-image-hint" />
-              {props.busy ? (
-                <ComposerPrimitive.Cancel
-                  disabled={!props.canCancel}
-                  className="factory-chat-button factory-chat-submit"
-                  aria-label="停止"
-                  title="停止生成"
-                >
-                  <StopOutlined aria-hidden="true" />
-                </ComposerPrimitive.Cancel>
-              ) : (
-                <ComposerPrimitive.Send
-                  className="factory-chat-button primary factory-chat-submit"
-                  aria-label="发送"
-                  title="发送消息"
-                >
-                  <ArrowUpOutlined aria-hidden="true" />
-                </ComposerPrimitive.Send>
+          )}
+          <div className="factory-chat-compose-area">
+            <ComposerPrimitive.Root className="factory-chat-composer">
+              <div className="factory-chat-attachments">
+                <ComposerPrimitive.Attachments
+                  components={{ Attachment: PendingAttachment }}
+                />
+              </div>
+              {props.employeeReference && (
+                <div className="factory-chat-reference-picker">
+                  <span>
+                    引用员工 ·{" "}
+                    {props.employees?.find(
+                      (employee) => employee.id === props.employeeReference,
+                    )?.profile.name ?? "当前员工"}
+                  </span>
+                  {props.onReferenceChange && (
+                    <button
+                      type="button"
+                      aria-label="移除员工引用"
+                      disabled={props.busy}
+                      onClick={() => props.onReferenceChange?.("")}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               )}
-            </div>
-          </ComposerPrimitive.Root>
-          <div className="factory-chat-compose-footer">
-            <span>Enter 发送 · Shift + Enter 换行 · 图片和文件最多 4 个</span>
-            <span
-              className="factory-chat-session"
-              title={
-                props.threadId
-                  ? "持续会话 · 历史由 Codex 管理"
-                  : "首次发送后建立持续会话"
-              }
-            >
-              <i aria-hidden="true" />
-              {props.threadId ? "上下文已连接" : "准备就绪"}
-            </span>
-            <BuildButton
-              busy={props.busy}
-              onBuild={async (goal) => {
-                if (await props.onBuild(goal)) {
-                  runtime.thread.composer.setText("");
-                  return true;
+              <ComposerPrimitive.Input
+                aria-label="讨论当前AI 团队"
+                placeholder="直接与 Codex 对话，也可以添加文件或粘贴图片…"
+                minRows={2}
+                maxRows={7}
+                maxLength={12000}
+                disabled={props.busy}
+                cancelOnEscape={false}
+              />
+              <div className="factory-chat-actions">
+                <ComposerPrimitive.AddAttachment
+                  disabled={props.busy}
+                  className="factory-chat-button"
+                >
+                  <PictureOutlined aria-hidden="true" /> 添加图片
+                </ComposerPrimitive.AddAttachment>
+                <ComposerPrimitive.AddAttachment
+                  disabled={props.busy}
+                  className="factory-chat-button"
+                >
+                  📎 添加文件
+                </ComposerPrimitive.AddAttachment>
+                <span className="factory-chat-image-hint" />
+                {props.busy ? (
+                  <ComposerPrimitive.Cancel
+                    disabled={!props.canCancel}
+                    className="factory-chat-button factory-chat-submit"
+                    aria-label="停止"
+                    title="停止生成"
+                  >
+                    <StopOutlined aria-hidden="true" />
+                  </ComposerPrimitive.Cancel>
+                ) : (
+                  <ComposerPrimitive.Send
+                    className="factory-chat-button primary factory-chat-submit"
+                    aria-label="发送"
+                    title="发送消息"
+                  >
+                    <ArrowUpOutlined aria-hidden="true" />
+                  </ComposerPrimitive.Send>
+                )}
+              </div>
+            </ComposerPrimitive.Root>
+            <div className="factory-chat-compose-footer">
+              <span>Enter 发送 · Shift + Enter 换行 · 图片和文件最多 4 个</span>
+              <span
+                className="factory-chat-session"
+                title={
+                  props.threadId
+                    ? "持续会话 · 历史由 Codex 管理"
+                    : "首次发送后建立持续会话"
                 }
-                return false;
-              }}
-            />
+              >
+                <i aria-hidden="true" />
+                {props.threadId ? "上下文已连接" : "准备就绪"}
+              </span>
+              <BuildButton
+                busy={props.busy}
+                onBuild={async (goal) => {
+                  if (await props.onBuild(goal)) {
+                    runtime.thread.composer.setText("");
+                    return true;
+                  }
+                  return false;
+                }}
+              />
+            </div>
           </div>
-        </div>
-      </ThreadPrimitive.Root>
+        </ThreadPrimitive.Root>
+        <WorkspaceBrowser
+          key={props.workspaceId}
+          projectId={props.workspaceId}
+        />
+      </div>
     </AssistantRuntimeProvider>
   );
 }

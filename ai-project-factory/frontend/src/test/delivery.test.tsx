@@ -30,7 +30,7 @@ it("用户任务交给平台执行且保留重试参数", async () => {
     <DeliveryPanel projectId="p" disabled={false} onStarted={refreshed} />,
   );
   await userEvent.click(
-    screen.getByRole("button", { name: "启动项目自动开发与样例验证" }),
+    screen.getByRole("button", { name: "启动AI 团队自动开发与样例验证" }),
   );
   expect(api).toHaveBeenCalledWith(
     "/workspaces/p/delivery-runs",

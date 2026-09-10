@@ -6,7 +6,7 @@ import {
   FolderOpenOutlined,
   UnorderedListOutlined,
 } from "@ant-design/icons";
-import { useWebEditor } from "./useWebEditor";
+import { useLocalEditor } from "./useLocalEditor";
 import EmployeeDirectoryFiles from "./EmployeeDirectoryFiles";
 import OutputFileBrowser from "./OutputFileBrowser";
 import { outputChain, type OutputStep } from "./buildOutputChain";
@@ -22,7 +22,7 @@ export default function OutputChain({
   runs: TaskRun[];
   workspaceBase?: string;
 }) {
-  const editor = useWebEditor(workspaceBase);
+  const editor = useLocalEditor(workspaceBase);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [browser, setBrowser] = useState<{ key: string; file?: string } | null>(
     null,
@@ -69,12 +69,12 @@ export default function OutputChain({
         <span>按员工查看产出文件</span>
       </div>
       <p className="employee-output-note">
-        点击文件或文件夹进入网页版 VS Code，编辑工作副本；历史快照保留。
+        点击文件或文件夹进入本机 VS Code，编辑工作副本；历史快照保留。
       </p>
       {editor.error && <Alert type="error" message={editor.error} />}
       {editor.url && (
-        <a href={editor.url} target="_blank" rel="noopener noreferrer">
-          打开网页版 VS Code（若新标签页未弹出，点击这里）
+        <a href={editor.url}>
+          打开本机 VS Code（若未唤起，点击这里）
         </a>
       )}
       {missing && (
@@ -105,7 +105,7 @@ export default function OutputChain({
                   type="text"
                   icon={<FolderOpenOutlined />}
                   aria-label={`打开${group.name}产出目录`}
-                  title="在网页版 VS Code 中打开目录"
+                  title="在本机 VS Code 中打开目录"
                   disabled={editor.opening || !workspaceBase}
                   onClick={() =>
                     editor.open(group.steps[group.steps.length - 1])

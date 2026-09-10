@@ -15,7 +15,7 @@ const member = (key: string, kind: "ai" | "human" = "ai"): Member => ({
   outputs: ["交付"],
 });
 const draft: Draft = {
-  name: "项目",
+  name: "AI 团队",
   goal: "目标",
   members: [member("需求AI"), member("架构AI"), member("负责人", "human")],
   workflow: [
@@ -79,12 +79,12 @@ it("重复步骤合并为一位员工，投影真实交接并保留人工接收�
   expect(changed.assignments["架构AI"]).toBe("专业人类");
 });
 
-it("没有人类成员时展示默认项目负责人，不改写原始成员", () => {
+it("没有人类成员时展示默认AI 团队负责人，不改写原始成员", () => {
   const noHumans = {
     ...draft,
     members: draft.members.filter((m) => m.kind === "ai"),
   };
-  expect(employeeGraph(noHumans).humans[0].name).toBe("项目负责人（你）");
+  expect(employeeGraph(noHumans).humans[0].name).toBe("AI 团队负责人（你）");
   expect(noHumans.members).toHaveLength(2);
 });
 

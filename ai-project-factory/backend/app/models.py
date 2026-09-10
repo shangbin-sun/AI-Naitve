@@ -150,3 +150,10 @@ class MessageReference(Base):
     message_id: Mapped[str] = mapped_column(ForeignKey('messages.id'), primary_key=True)
     employee_id: Mapped[str] = mapped_column(ForeignKey('employees.id'))
     name: Mapped[str] = mapped_column(String)
+
+
+class ProjectInstructions(Base):
+    __tablename__ = 'project_instructions'
+    design_id: Mapped[str] = mapped_column(ForeignKey('designs.id'), primary_key=True)
+    files: Mapped[dict] = mapped_column(JSON, default=dict)
+    version: Mapped[int] = mapped_column(Integer, default=1)

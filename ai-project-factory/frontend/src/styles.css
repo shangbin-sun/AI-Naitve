@@ -2395,3 +2395,14 @@ div.member-row:hover {
 .evaluation-check { padding: 16px 0; border-top: 1px solid #e5eaf1; }
 .evaluation-check strong { margin-right: 12px; }
 @media(max-width:650px){.evidence-page{padding:16px}.source-import .ant-input{margin-bottom:12px}.source-card,.evaluation-card{padding:16px}}
+
+/* Direct navigation into persistent AI teams. */
+.sidebar-teams { margin-top: 18px; min-height: 80px; flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.sidebar-teams-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 12px 8px; color: #aab7ce; font-size: 12px; }
+.sidebar-teams-heading button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 6px; }
+.sidebar-team-list { overflow-y: auto; min-height: 0; }
+.sidebar-team-list p { padding: 0 12px; color: #aab7ce; font-size: 12px; }
+.sidebar-team-item { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 8px; padding: 10px 12px; background: transparent; color: #b9c6dc; cursor: pointer; text-align: left; }
+.sidebar-team-item span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-team-item:hover, .sidebar-team-item.selected { color: #fff; background: #273955; }
+@media (max-width: 760px) { .sidebar-teams { display: none; } }
