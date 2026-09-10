@@ -92,7 +92,7 @@ it("点击员工卡片直接打开对应编辑器，不显示重复协作详情"
   const onEmployee = vi.fn();
   render(<EmployeeWorkflow draft={draft} onEmployee={onEmployee} />);
   expect(screen.queryByText("原文")).toBeNull();
-  await userEvent.click(screen.getByRole("button", { name: /需求AI职责/ }));
+  await userEvent.click(screen.getByRole("button", { name: "需求AI 查看详情" }));
   expect(onEmployee).toHaveBeenCalledOnce();
   expect(onEmployee).toHaveBeenCalledWith(draft.members[0]);
   expect(screen.queryByRole("region", { name: "需求AI的协作详情" })).toBeNull();

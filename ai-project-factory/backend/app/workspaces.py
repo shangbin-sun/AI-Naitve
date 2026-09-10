@@ -74,7 +74,9 @@ class Workspaces:
                     employee.version += 1
             sources = list(db.scalars(select(Source).where(Source.design_id == project).order_by(Source.id)))
             attachments = list(db.scalars(select(ChatAttachment).where(ChatAttachment.design_id == project, ChatAttachment.message_id.is_not(None)).order_by(ChatAttachment.id)))
-            value = {'organization_instructions': (Path(__file__).parent / 'instructions/organization.md').read_text(encoding='utf-8'),
+            from .dashboards import current_dashboard
+            dashboard = current_dashboard(db, project)
+            value = {'dashboard': dashboard, 'organization_instructions': (Path(__file__).parent / 'instructions/organization.md').read_text(encoding='utf-8'),
                      'project_files': dict(rules.files), 'instructions_version': rules.version,
                      'project_id': project, 'version': design.version, 'title': design.title, 'draft': design.draft,
                      'employees': {e.key: {'id': e.id, 'version': e.version, 'profile': e.profile, 'files': e.files} for e in employees},
@@ -88,6 +90,12 @@ class Workspaces:
                     directory = Path(temp) / 'content'
                     directory.mkdir()
                     write_json(directory / 'definition.json', value)
+                    if dashboard:
+                        for name, content in dashboard['files'].items():
+                            page_path = safe_path(directory / 'dashboard', name)
+                            page_path.parent.mkdir(parents=True, exist_ok=True)
+                            page_path.write_text(content, encoding='utf-8')
+                        write_json(directory / 'dashboard/manifest.json', {k:v for k,v in dashboard.items() if k!='files'})
                     (directory / 'AGENTS.md').write_text(value['organization_instructions'], encoding='utf-8')
                     for name, content in rules.files.items():
                         path = safe_path(directory / 'project', name)

@@ -14,7 +14,7 @@ import { Alert, Button, Image, Spin } from "antd";
 import Markdown from "react-markdown";
 import {
   ArrowUpOutlined,
-  PictureOutlined,
+  PaperClipOutlined,
   StopOutlined,
   ExperimentOutlined,
 } from "@ant-design/icons";
@@ -26,6 +26,7 @@ import WorkspaceBrowser from "../WorkspaceBrowser";
 import type { ChatMessage } from "./types";
 type Props = {
   workspaceId: string;
+  filesOpen?: boolean;
   employees?: { id: string; profile: { name: string } }[];
   employeeReference?: string;
   onReferenceChange?: (id: string) => void;
@@ -42,7 +43,7 @@ type Props = {
   canCancel: boolean;
   onSend: (text: string, attachmentIds: string[]) => Promise<boolean>;
   onCancel: () => Promise<void>;
-  onBuild: (goal: string) => Promise<boolean>;
+  onBuild?: (goal: string) => Promise<boolean>;
 };
 
 export function convertMessage(message: ChatMessage): ThreadMessageLike {
@@ -151,7 +152,7 @@ function BuildButton({ onBuild, busy }: Pick<Props, "onBuild" | "busy">) {
       title={
         attachments.length ? "先发送附件并完善方案，再启动构建验证" : undefined
       }
-      onClick={() => void onBuild(text)}
+      onClick={() => void onBuild?.(text)}
     >
       构建验证
     </Button>
@@ -356,14 +357,10 @@ export default function ProjectChat(props: Props) {
                 <ComposerPrimitive.AddAttachment
                   disabled={props.busy}
                   className="factory-chat-button"
+                  aria-label="添加附件"
+                  title="添加图片或文件，最多 4 个；也可直接粘贴图片"
                 >
-                  <PictureOutlined aria-hidden="true" /> 添加图片
-                </ComposerPrimitive.AddAttachment>
-                <ComposerPrimitive.AddAttachment
-                  disabled={props.busy}
-                  className="factory-chat-button"
-                >
-                  📎 添加文件
+                  <PaperClipOutlined aria-hidden="true" /> 附件
                 </ComposerPrimitive.AddAttachment>
                 <span className="factory-chat-image-hint" />
                 {props.busy ? (
@@ -379,43 +376,31 @@ export default function ProjectChat(props: Props) {
                   <ComposerPrimitive.Send
                     className="factory-chat-button primary factory-chat-submit"
                     aria-label="发送"
-                    title="发送消息"
+                    title="Enter 发送 · Shift + Enter 换行"
                   >
                     <ArrowUpOutlined aria-hidden="true" />
                   </ComposerPrimitive.Send>
                 )}
               </div>
             </ComposerPrimitive.Root>
-            <div className="factory-chat-compose-footer">
-              <span>Enter 发送 · Shift + Enter 换行 · 图片和文件最多 4 个</span>
-              <span
-                className="factory-chat-session"
-                title={
-                  props.threadId
-                    ? "持续会话 · 历史由 Codex 管理"
-                    : "首次发送后建立持续会话"
-                }
-              >
-                <i aria-hidden="true" />
-                {props.threadId ? "上下文已连接" : "准备就绪"}
-              </span>
-              <BuildButton
+            {props.onBuild && <div className="factory-chat-compose-footer">
+              {props.onBuild && <BuildButton
                 busy={props.busy}
                 onBuild={async (goal) => {
-                  if (await props.onBuild(goal)) {
+                  if (await props.onBuild?.(goal)) {
                     runtime.thread.composer.setText("");
                     return true;
                   }
                   return false;
                 }}
-              />
-            </div>
+              />}
+            </div>}
           </div>
         </ThreadPrimitive.Root>
-        <WorkspaceBrowser
+        {props.filesOpen && <WorkspaceBrowser
           key={props.workspaceId}
           projectId={props.workspaceId}
-        />
+        />}
       </div>
     </AssistantRuntimeProvider>
   );

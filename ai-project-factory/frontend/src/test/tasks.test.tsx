@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { LegacyTasksPanel as TasksPanel } from "../tasks/TasksPanel";
+import TasksPanel from "../tasks/LegacyTasksPanel";
 import { api } from "../api";
 vi.mock("../api", () => ({ api: vi.fn() }));
 vi.mock("../tasks/AgentRunsPanel", () => ({ default: () => null }));

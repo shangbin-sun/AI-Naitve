@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { Button, Space } from "antd";
 import {
+  EditOutlined,
+  PlayCircleOutlined,
   RobotOutlined,
   UserOutlined,
   ArrowRightOutlined,
@@ -112,10 +115,12 @@ export default function EmployeeWorkflow({
   draft,
   onEmployee,
   onQuestion,
+  onRun,
 }: {
   draft: Draft;
   onEmployee?: (member: Member) => void;
   onQuestion?: (question: string) => void;
+  onRun?: (employee?: string) => void;
 }) {
   const graph = employeeGraph(draft);
   const [selected, setSelected] = useState<string | null>(null);
@@ -135,14 +140,12 @@ export default function EmployeeWorkflow({
           <h3>员工协作</h3>
           <p>AI 员工协作完成工作，需要人工处理的问题向上交接。</p>
         </div>
+        <Space wrap>
         {onQuestion && (
-          <button
-            className="workflow-text-button"
-            onClick={() => onQuestion("请帮我调整员工协作与人工分工。")}
-          >
-            调整协作 <ArrowRightOutlined />
-          </button>
+          <Button aria-label="优化团队" icon={<EditOutlined />} onClick={() => onQuestion("请帮我优化当前团队的员工协作与人工分工。")}>优化</Button>
         )}
+        {onRun && <Button type="primary" aria-label="执行团队" icon={<PlayCircleOutlined />} disabled={!graph.ai.length} onClick={()=>onRun()}>执行</Button>}
+        </Space>
       </div>
       <div className="workflow-canvas" aria-label="员工协作节点图">
         <div className="workflow-canvas-legend">
@@ -323,8 +326,9 @@ export default function EmployeeWorkflow({
                 <i className="workflow-port right" />
               </button>
               {graph.ai.map((employee) => (
+                <div className="workflow-node-shell" key={employee.key}>
                 <button
-                  key={employee.key}
+                  aria-label={`${employee.name} 查看详情`}
                   className={`workflow-node ai-node ${selected === employee.key ? "selected" : ""}`}
                   onClick={() => {
                     setSelected(null);
@@ -355,9 +359,14 @@ export default function EmployeeWorkflow({
                     {employee.role}
                   </span>
                   <span className="workflow-node-footer">
-                    查看详情 <ArrowRightOutlined />
+                    {!onRun && !onQuestion && <>查看详情 <ArrowRightOutlined /></>}
                   </span>
                 </button>
+                {(onQuestion || onRun) && <div className="workflow-node-actions">
+                  {onQuestion && <button aria-label={`优化 ${employee.name}`} onClick={()=>onQuestion(`请帮我优化员工「${employee.name}」（${employee.key}）的职责、指令、输入输出与验收要求，保留其他员工的配置。`)}><EditOutlined /> 优化</button>}
+                  {onRun && <button className="primary" aria-label={`单独执行 ${employee.name}`} onClick={()=>onRun(employee.key)}><PlayCircleOutlined /> 执行</button>}
+                </div>}
+                </div>
               ))}
               <button
                 className={`workflow-node boundary-node output-node ${selected === "@output" ? "selected" : ""}`}

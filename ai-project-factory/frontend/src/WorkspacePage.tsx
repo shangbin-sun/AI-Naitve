@@ -50,7 +50,7 @@ export default function WorkspacePage({
       mask={false}
       push={false}
       rootClassName="workspace-page"
-      rootStyle={{ inset: "var(--topbar-height) 0 0 var(--sidebar-width)" }}
+      rootStyle={{ inset: "0 0 0 var(--sidebar-width)" }}
       styles={{ wrapper: { boxShadow: "none" }, body: { padding: 0 } }}
       closeIcon={
         <span className="page-back">

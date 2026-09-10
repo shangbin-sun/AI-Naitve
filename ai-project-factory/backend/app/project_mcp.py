@@ -91,5 +91,19 @@ def feishu_desktop(action: str, state_id: str = '', element_id: str = '', text: 
     return call('feishu_desktop', action=action, state_id=state_id, element_id=element_id, text=text, key=key)
 
 
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False))
+def get_dashboard() -> dict:
+    """读取独立看板版本、页面包和数据契约；生成看板前先调用。"""
+    return call('get_dashboard')
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False))
+def save_dashboard(expected_version: int, title: str, files: dict[str,str], data_schema: dict,
+                   sample_data: dict, request_id: str, data_node: str = '', data_file: str = 'dashboard.json') -> dict:
+    """保存自动编程看板的独立版本。HTML/CSS/JS 不覆盖规则、技能或员工编辑。index.html 为入口；JSON 通过 window.DASHBOARD_DATA 注入。仅本地静态资源，无外部请求。保存不等于真实数据/业务验收通过。"""
+    return call('save_dashboard',expected_version=expected_version,title=title,files=files,data_schema=data_schema,
+                sample_data=sample_data,request_id=request_id,data_node=data_node,data_file=data_file)
+
+
 if __name__ == '__main__':
     mcp.run(transport='stdio')

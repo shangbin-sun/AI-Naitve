@@ -3,7 +3,6 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
-import os
 import platform
 import re
 import tarfile

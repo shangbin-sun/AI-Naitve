@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ProjectChat from "../chat/ProjectChat";
-vi.mock("../WorkspaceBrowser", () => ({ default: () => null }));
+vi.mock("../WorkspaceBrowser", () => ({ default: () => <aside aria-label="团队文件" /> }));
 import { createAttachmentAdapter } from "../chat/attachments";
 import { api } from "../api";
 vi.mock("../api", () => ({ api: vi.fn() }));
@@ -18,6 +18,19 @@ function props() {
   };
 }
 describe("AI 团队对话", () => {
+  it("文件默认收起，展开和收起时保留对话草稿，附件入口统一", async () => {
+    const p = props();
+    const view = render(<ProjectChat {...p} />);
+    expect(screen.queryByLabelText("团队文件")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "添加附件" })).toHaveLength(1);
+    await userEvent.type(screen.getByLabelText("讨论当前AI 团队"), "未发送的草稿");
+    view.rerender(<ProjectChat {...p} filesOpen />);
+    expect(screen.getByLabelText("团队文件")).toBeInTheDocument();
+    expect(screen.getByLabelText("讨论当前AI 团队")).toHaveValue("未发送的草稿");
+    view.rerender(<ProjectChat {...p} filesOpen={false} />);
+    expect(screen.queryByLabelText("团队文件")).toBeNull();
+    expect(screen.getByLabelText("讨论当前AI 团队")).toHaveValue("未发送的草稿");
+  });
   it("Markdown 无 MIME 时可上传，待发送与历史均不生成图片", async () => {
     const doc = {
       id: "markdown",

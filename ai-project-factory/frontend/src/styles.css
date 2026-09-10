@@ -70,31 +70,16 @@ a {
 .brand-mark span {
   color: #a3c87c;
 }
-.workspace-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 36px 5px 30px;
-  padding: 12px 9px;
-  border: 1px solid #dce4d9;
-  border-radius: 9px;
-  font-size: 12px;
-}
-.workspace-label small,
 .runtime-card small {
   display: block;
   color: #849087;
   font-size: 11px;
   margin-top: 5px;
 }
-.workspace-icon,
 .user-avatar {
   background: #e0e9db;
   border-radius: 8px;
   padding: 8px 10px;
-}
-.workspace-label > .tiny-dot {
-  margin-left: auto;
 }
 .tiny-dot {
   display: inline-block;
@@ -207,37 +192,6 @@ a {
   margin-left: 246px;
   flex: 1;
   min-width: 0;
-}
-.topbar {
-  height: 74px;
-  border-bottom: 1px solid #e8ede6;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 38px;
-  font-size: 12px;
-}
-.breadcrumb {
-  color: #929b93;
-}
-.slash {
-  margin: 0 16px;
-  color: #c2c9c0;
-}
-.local-badge {
-  font-size: 9px;
-  letter-spacing: 1.3px;
-  color: #939d90;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.version {
-  border: 1px solid #dfe5da;
-  padding: 3px 6px;
-  border-radius: 4px;
-  margin-left: 9px;
-  letter-spacing: 0;
 }
 .welcome {
   max-width: 890px;
@@ -367,28 +321,8 @@ a {
   padding: 100px;
   color: #85917e;
 }
-.design-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 28px 19px;
-}
 .small {
   font-size: 9px;
-}
-.design-heading h2 {
-  font-weight: 550;
-  font-size: 21px;
-  margin: 8px 0 0;
-}
-.design-heading h2 .ant-tag {
-  font-size: 10px;
-  vertical-align: middle;
-  margin-left: 8px;
-}
-.header-actions {
-  display: flex;
-  gap: 10px;
 }
 .studio {
   display: grid;
@@ -916,19 +850,6 @@ a {
   .preview-panel {
     min-height: 400px;
   }
-  .design-heading {
-    align-items: flex-start;
-    gap: 10px;
-  }
-  .design-heading h2 {
-    font-size: 17px;
-  }
-  .header-actions {
-    flex-wrap: wrap;
-  }
-  .local-badge {
-    display: none;
-  }
 }
 @media (max-width: 650px) {
   .sidebar {
@@ -939,7 +860,6 @@ a {
     padding: 0;
   }
   .brand > div,
-  .workspace-label,
   .nav-label,
   .recent-heading,
   .recent-list,
@@ -967,10 +887,6 @@ a {
   .main {
     margin-left: 64px;
   }
-  .topbar {
-    height: 60px;
-    padding: 0 20px;
-  }
   .welcome {
     padding: 40px 20px;
   }
@@ -987,10 +903,6 @@ a {
   .composer-bottom > span {
     max-width: 50%;
     line-height: 1.6;
-  }
-  .design-heading {
-    padding: 20px;
-    flex-direction: column;
   }
   .team-preview {
     padding: 16px;
@@ -1063,23 +975,6 @@ a:focus-visible {
 }
 .brand-mark span {
   color: #cad7ff;
-}
-.workspace-label {
-  background: #1c2535;
-  border: 1px solid #ffffff0d;
-  margin-top: 32px;
-  color: #e5eaf3;
-  padding: 12px;
-  border-radius: 9px;
-}
-.workspace-label small {
-  color: #8a98b0;
-}
-.workspace-icon {
-  background: #2b3851;
-  color: #becdf7;
-  font-size: 12px;
-  font-weight: 600;
 }
 .nav-label,
 .recent-heading {
@@ -1181,29 +1076,6 @@ a:focus-visible {
 }
 .main {
   background: #f5f7fb;
-}
-.topbar {
-  background: #ffffffed;
-  border-bottom: 1px solid #e6eaf1;
-  height: 66px;
-  padding: 0 30px;
-  color: #344054;
-  font-size: 12px;
-}
-.breadcrumb {
-  color: #98a2b3;
-}
-.slash {
-  color: #d0d5dd;
-}
-.local-badge {
-  color: #8491a6;
-  letter-spacing: 1.2px;
-}
-.version {
-  border-color: #e4e9f2;
-  background: #f8faff;
-  color: #65748c;
 }
 .welcome {
   max-width: 940px;
@@ -1318,37 +1190,11 @@ a:focus-visible {
   color: #6682c3;
   font-weight: 600;
 }
-.design-heading {
-  padding: 25px 30px 23px;
-  background: #fff;
-  min-height: 105px;
-}
 .small {
   font-size: 9px;
   letter-spacing: 2px;
   color: #8291ac;
   font-weight: 600;
-}
-.design-heading h2 {
-  font-size: 23px;
-  color: #18263c;
-  font-weight: 650;
-  letter-spacing: -0.3px;
-  margin-top: 9px;
-}
-.design-heading h2 .ant-tag {
-  margin-left: 12px;
-  font-size: 10px;
-  font-weight: 400;
-  padding: 1px 9px;
-  border-radius: 5px;
-}
-.header-actions {
-  gap: 10px;
-}
-.header-actions .ant-btn {
-  font-size: 12px;
-  height: 34px;
 }
 .studio {
   height: calc(100vh - 171px);
@@ -1786,19 +1632,8 @@ a:focus-visible {
   .suggestions button {
     padding: 15px;
   }
-  .design-heading h2 {
-    font-size: 20px;
-  }
 }
 @media (max-width: 650px) {
-  .topbar {
-    height: 60px;
-    padding: 0 20px;
-  }
-  .design-heading {
-    padding: 20px;
-    min-height: 0;
-  }
   .welcome {
     padding: 35px 20px;
   }
@@ -1825,9 +1660,6 @@ a:focus-visible {
   }
   .member-row {
     padding: 16px 13px;
-  }
-  .design-heading h2 {
-    font-size: 19px;
   }
   .chat-composer {
     margin: 0 15px 16px;
@@ -1866,7 +1698,6 @@ a:focus-visible {
   --text-action: #3556ba;
 }
 .welcome h1,
-.design-heading h2,
 .library-heading h1,
 .goal-card h3,
 .member-content strong,
@@ -1937,11 +1768,8 @@ a:focus-visible {
 }
 .composer-bottom > span,
 .panel-heading small,
-.breadcrumb,
 .revision small,
 .thinking small,
-.local-badge,
-.version,
 .member-number,
 .small,
 .preview-empty p,
@@ -1996,7 +1824,6 @@ a:focus-visible {
 .nav-label,
 .recent-heading,
 .sidebar-hint,
-.workspace-label small,
 .runtime-card small,
 .sidebar-footer {
   color: #9eafc8;
@@ -2062,7 +1889,6 @@ div.member-row:hover {
 /* Detail and editing surfaces occupy the entire workspace, without a backdrop. */
 :root {
   --sidebar-width: 246px;
-  --topbar-height: 66px;
 }
 .workspace-page .ant-drawer-content {
   background: #f5f7fb;
@@ -2151,7 +1977,6 @@ div.member-row:hover {
 @media (max-width: 650px) {
   :root {
     --sidebar-width: 64px;
-    --topbar-height: 60px;
   }
   .workspace-page .ant-drawer-header {
     padding: 15px 12px;
@@ -2193,8 +2018,7 @@ div.member-row:hover {
 .is-hidden {
   display: none !important;
 }
-.project-list-heading,
-.project-history-heading {
+.project-list-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2220,63 +2044,14 @@ div.member-row:hover {
 .project-tabs .ant-tabs-tab {
   padding: 15px 4px;
 }
-.project-overview,
-.project-history {
-  padding: 32px;
-}
-.project-intro,
-.project-readiness {
-  padding: 28px;
-  background: #fff;
-  border: 1px solid #e1e7f0;
-  border-radius: 12px;
-}
-.project-intro h2 {
-  font-size: 23px;
-  line-height: 1.6;
-  max-width: 1000px;
-  color: #19263b;
-}
-.project-intro p,
-.project-readiness p,
-.project-history-heading p {
-  color: #536176;
-  line-height: 1.8;
-}
-.project-intro .ant-btn,
-.project-readiness > .ant-btn {
-  margin: 10px 12px 12px 0;
-}
-.project-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  margin: 24px 0;
-}
-.project-metrics > div {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  padding: 22px;
-  background: #fff;
-  border: 1px solid #e1e7f0;
-  border-radius: 10px;
-}
-.project-metrics strong {
-  font-size: 28px;
-  color: #23334b;
-}
-.project-metrics span {
-  color: #536176;
-}
 .project-studio.studio {
   display: block;
   height: auto;
-  min-height: calc(100dvh - 235px);
+  min-height: calc(100dvh - 56px);
   border-top: 0;
 }
 .project-studio .chat-panel {
-  height: calc(100dvh - 230px);
+  height: calc(100dvh - 56px);
   min-height: 420px;
   border: 0;
 }
@@ -2337,32 +2112,17 @@ div.member-row:hover {
   margin: 12px 0;
 }
 @media (max-width: 650px) {
-  .project-list-heading,
-  .project-history-heading {
+  .project-list-heading {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
     margin-bottom: 20px;
   }
-  .project-overview,
-  .project-history,
   .project-studio .team-preview {
     padding: 16px;
   }
   .project-tabs {
     padding: 0 16px;
-  }
-  .project-metrics {
-    gap: 8px;
-  }
-  .project-metrics > div {
-    padding: 12px 8px;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .project-intro,
-  .project-readiness {
-    padding: 18px;
   }
   .project-studio .members {
     grid-template-columns: 1fr;
@@ -2379,30 +2139,57 @@ div.member-row:hover {
 .project-card .card-footer {
   margin-top: auto;
 }
-.main > .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-.evidence-page { padding: 28px 32px; }
-.evidence-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.source-import,.source-form,.source-card,.evaluation-card { padding: 22px; margin: 16px 0; border: 1px solid #e0e6f0; border-radius: 10px; background: #fff; }
+.source-import { padding: 22px; margin: 16px 0; border: 1px solid #e0e6f0; border-radius: 10px; background: #fff; }
 .source-import .ant-input { max-width: 700px; margin-right: 12px; }
-.source-form summary { cursor: pointer; font-weight: 600; margin-bottom: 12px; }
-.source-form .ant-input,.source-form .ant-select { margin: 8px 0; }
-.source-card pre,.evaluation-card pre { max-height: 440px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 18px; background: #f4f6fa; }
-.source-card small,.evaluation-card small { color: #526278; overflow-wrap: anywhere; }
-.evaluation-check { padding: 16px 0; border-top: 1px solid #e5eaf1; }
-.evaluation-check strong { margin-right: 12px; }
-@media(max-width:650px){.evidence-page{padding:16px}.source-import .ant-input{margin-bottom:12px}.source-card,.evaluation-card{padding:16px}}
+@media(max-width:650px){.source-import .ant-input{margin-bottom:12px}}
 
 /* Direct navigation into persistent AI teams. */
 .sidebar-teams { margin-top: 18px; min-height: 80px; flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 .sidebar-teams-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 12px 8px; color: #aab7ce; font-size: 12px; }
-.sidebar-teams-heading button { border: 0; background: transparent; color: inherit; cursor: pointer; padding: 6px; }
 .sidebar-team-list { overflow-y: auto; min-height: 0; }
 .sidebar-team-list p { padding: 0 12px; color: #aab7ce; font-size: 12px; }
 .sidebar-team-item { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; border-radius: 8px; padding: 10px 12px; background: transparent; color: #b9c6dc; cursor: pointer; text-align: left; }
 .sidebar-team-item span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-team-item:hover, .sidebar-team-item.selected { color: #fff; background: #273955; }
 @media (max-width: 760px) { .sidebar-teams { display: none; } }
+
+/* Fixed navigation has its own reserved space above scrolling content. */
+.project-navigation { height: 56px; flex-shrink: 0; }
+.project-tabs {
+  position: fixed; inset: 0 0 auto var(--sidebar-width); z-index: 30;
+  box-sizing: border-box; height: 56px; background: #fff;
+  border-bottom: 1px solid #e8ecf3;
+}
+.project-tabs .ant-tabs-nav { height: 55px; padding: 0 88px; }
+.project-tabs .ant-tabs-nav::before { border: 0; }
+.project-tabs .ant-tabs-nav-wrap { justify-content: center; }
+.project-tabs .ant-tabs-nav-list { gap: 30px; }
+.project-tabs .ant-tabs-tab { margin: 0 !important; padding: 16px 2px; font-size: 14px; }
+.project-tabs .ant-tabs-tab-btn { color: #697386; }
+.project-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn { color: #425cc7; }
+.project-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { color: #425cc7; font-weight: 600; text-shadow: none; }
+.project-tabs .ant-tabs-ink-bar { height: 2px; background: #526bdd; }
+.project-tabs .ant-tabs-extra-content { position: absolute; right: 0; margin: 0; }
+.project-tabs .ant-tabs-content-holder { display: none; }
+@media (max-width: 650px) {
+  .project-tabs { padding: 0 8px; }
+  .project-tabs .ant-tabs-nav { padding: 0 32px; }
+  .project-tabs .ant-tabs-nav-list { gap: 14px; }
+  .project-tabs .ant-tabs-tab { font-size: 12px; }
+  .project-tabs .ant-tabs-extra-content .ant-btn { width: 30px; padding: 0; gap: 0; font-size: 0; }
+  .project-tabs .ant-tabs-extra-content .anticon { font-size: 15px; }
+}
+
+.sidebar-create-team {
+  display: flex; align-items: center; gap: 10px;
+  margin: 28px 5px 16px; padding: 12px 14px;
+  border: 1px solid #3d5070; border-radius: 9px;
+  background: #243650; color: #eef2ff;
+  font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.sidebar-create-team:hover { background: #304766; }
+.sidebar-create-team:focus-visible { outline: 2px solid #839dff; outline-offset: 3px; }
+@media (max-width: 760px) {
+  .sidebar-create-team { justify-content: center; margin: 20px 0; padding: 10px; }
+  .sidebar-create-team > span:not(.anticon) { display: none; }
+}

@@ -565,3 +565,10 @@
 .workflow-canvas-empty {
   top: 210px;
 }
+
+.workflow-node-shell { position: relative; flex: 0 0 260px; width: 260px; }
+ .workflow-node-actions { position: absolute; left: 12px; right: 12px; bottom: 7px; display: flex; gap: 8px; }
+.workflow-node-actions button { flex: 1; border: 0; border-radius: 6px; background: #f4f6fa; color: #65738b; padding: 6px 9px; cursor: pointer; font: inherit; font-size: 12px; }
+.workflow-node-actions button.primary { background: #eef1ff; color: #536bd8; }
+.workflow-node-actions button:hover { background: #dfe5ff; color: #536bd8; }
+.workflow-node-actions button:focus-visible { outline: 2px solid #536bd8; outline-offset: 2px; }

@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from .models import Source, Evaluation, Design, Employee, uid
+from .models import Source, Evaluation, Employee, uid
 from .service import get_design
 from .schemas import Strict
 from .employee_builder import build_employee, run_employee

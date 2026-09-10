@@ -15,7 +15,7 @@ from fastapi import HTTPException
 from pydantic import Field
 from sqlalchemy import select
 
-from .models import Evaluation, Source, Employee
+from .models import Evaluation, Employee
 from .schemas import Strict
 from .service import apply_draft, get_design, validate_files
 

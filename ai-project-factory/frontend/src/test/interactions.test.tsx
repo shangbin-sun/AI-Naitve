@@ -172,7 +172,7 @@ describe("员工编辑器", () => {
 });
 
 function factory() {
-  mocked.mockImplementation(async (path, options) => {
+  mocked.mockImplementation(async (path, _options) => {
     if (path === "/workspaces") return [design];
     if (path === "/employees") return [employee];
     if (path === "/employees/employee-1") return employee;
@@ -223,12 +223,29 @@ describe("工作台入口", () => {
     ).toContain("模型实验团队");
     expect(screen.getByRole("button", { name: /创建AI 团队/ })).toBeEnabled();
   });
-  it("团队标签、问题填入、历史打开关闭", async () => {
+  it("工作流入口打开预选范围的任务启动半窗", async () => {
+    const user = factory();
+    await user.click(await screen.findByRole("button", {name:"查看 AI 团队 交互测试团队"}));
+    await user.click(screen.getByRole("tab", {name:"团队"}));
+    await user.click(screen.getByRole("button", {name:/执行团队/}));
+    expect(await screen.findByLabelText("任务输入")).toBeVisible();
+    expect(screen.getByText("团队执行")).toBeVisible();
+    await user.click(screen.getByRole("button", {name:"关闭"}));
+    await user.click(screen.getByRole("tab", {name:"团队"}));
+    await user.click(screen.getByRole("button", {name:"单独执行 测试分析员"}));
+    expect(await screen.findByLabelText("任务输入")).toBeVisible();
+    expect(screen.getByText("单员工执行")).toBeVisible();
+    await user.click(screen.getByRole("button", {name:"关闭"}));
+    await user.click(screen.getByRole("tab", {name:"团队"}));
+    await user.click(screen.getByRole("tab", {name:"任务与运行"}));
+    expect(screen.queryByLabelText("任务输入")).toBeNull();
+  });
+  it("团队标签、任务入口、历史打开关闭", async () => {
     const user = factory();
     await user.click(
       await screen.findByRole("button", { name: "查看 AI 团队 交互测试团队" }),
     );
-    await user.click(await screen.findByRole("tab", { name: "工作流" }));
+    await user.click(await screen.findByRole("tab", { name: "团队" }));
     await user.click(
       screen.getByRole("button", { name: /测试分析员.*查看详情/ }),
     );
@@ -239,22 +256,14 @@ describe("工作台入口", () => {
     ).toBeNull();
     expect(screen.queryByRole("button", { name: /编辑方案/ })).toBeNull();
     await user.click(screen.getByRole("tab", { name: "任务与运行" }));
-    expect(screen.getByText("等待配置")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /使用什么数据/ }));
-    expect(screen.getByLabelText("讨论当前AI 团队")).toHaveValue(
-      "使用什么数据？\n我的回答：",
-    );
-    await user.click(screen.getByRole("tab", { name: "版本记录" }));
-    await user.click(screen.getByRole("button", { name: /查看修订记录/ }));
-    expect(await screen.findByText("方案修订历史")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "关闭" }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("dialog", { name: "方案修订历史" }),
-      ).not.toBeInTheDocument(),
-    );
+    expect(await screen.findByRole("button", { name: /新建任务/ })).toBeVisible();
+    const tabs = screen.getAllByRole("tab").map(t => t.textContent);
+    expect(tabs.slice(0,4)).toEqual(["对话","团队","任务与运行","看板"]);
+    expect(screen.queryByRole("tab", {name:"概览"})).toBeNull();
+    expect(screen.queryByRole("tab", {name:"版本记录"})).toBeNull();
+    expect(screen.queryByRole("tab", {name:"资料与评估"})).toBeNull();
   });
-  it("员工库入口和AI 团队快照打开关闭，问题可跳回团队", async () => {
+  it("员工库返回团队默认进入对话", async () => {
     const user = factory();
     await user.click(screen.getByRole("button", { name: /^robot 员工$/ }));
     await user.click(await screen.findByRole("button", { name: /测试分析员/ }));
@@ -264,18 +273,7 @@ describe("工作台入口", () => {
     await user.click(
       await screen.findByRole("button", { name: "查看 AI 团队 交互测试团队" }),
     );
-    await user.click(await screen.findByRole("tab", { name: "版本记录" }));
-    await user.click(await screen.findByRole("button", { name: /方案修订 1/ }));
-    expect(
-      await screen.findByText("已保存团队修订 1 的独立快照"),
-    ).toBeVisible();
-    expect(screen.getByRole("button", { name: /使用什么数据/ })).toBeEnabled();
-    await user.click(screen.getByRole("button", { name: "关闭" }));
-    await waitFor(() =>
-      expect(
-        screen.queryByText("已保存团队修订 1 的独立快照"),
-      ).not.toBeInTheDocument(),
-    );
+    expect(await screen.findByLabelText("讨论当前AI 团队")).toBeVisible();
   });
 });
 
@@ -316,7 +314,7 @@ describe("异步操作", () => {
     await user.click(
       await screen.findByRole("button", { name: "查看 AI 团队 交互测试团队" }),
     );
-    await user.click(await screen.findByRole("tab", { name: "工作流" }));
+    await user.click(await screen.findByRole("tab", { name: "团队" }));
     await user.click(screen.getByRole("tab", { name: "对话" }));
     await user.type(
       await screen.findByLabelText("讨论当前AI 团队"),
@@ -330,18 +328,7 @@ describe("异步操作", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /发送/ })).toBeDisabled();
   });
-  it("保存AI 团队快照有完成反馈", async () => {
-    const user = factory();
-    await user.click(
-      await screen.findByRole("button", { name: "查看 AI 团队 交互测试团队" }),
-    );
-    await user.click(await screen.findByRole("tab", { name: "工作流" }));
-    await user.click(screen.getByRole("tab", { name: "版本记录" }));
-    await user.click(screen.getByRole("button", { name: /保存方案快照/ }));
-    expect(
-      await screen.findByText("已保存团队修订 1 的独立快照"),
-    ).toBeVisible();
-  });
+
 });
 
 describe("AI 团队内员工详情", () => {
@@ -394,22 +381,7 @@ describe("AI 团队内员工详情", () => {
     );
     expect(onEdit).toHaveBeenCalledOnce();
   });
-  it("AI 团队待确认问题跳回原团队并填入问题", async () => {
-    const user = factory();
-    await user.click(screen.getByRole("link", { name: "返回团队首页" }));
-    await user.click(
-      await screen.findByRole("button", { name: "查看 AI 团队 交互测试团队" }),
-    );
-    await user.click(await screen.findByRole("tab", { name: "版本记录" }));
-    await user.click(await screen.findByRole("button", { name: /方案修订 1/ }));
-    await user.click(
-      await screen.findByRole("button", { name: /使用什么数据/ }),
-    );
-    expect(await screen.findByLabelText("讨论当前AI 团队")).toHaveValue(
-      "使用什么数据？\n我的回答：",
-    );
-    expect(localStorage.getItem("factory.design")).toBe("design-1");
-  });
+
 });
 
 describe("整页导航", () => {
@@ -458,7 +430,7 @@ describe("AI 团队中心主流程", () => {
     expect(await screen.findByLabelText("员工名称")).toHaveValue(member.name);
     await user.click(screen.getByRole("button", { name: "关闭" }));
     expect(window.location.hash).toBe("#/projects/design-1/plan");
-    expect(screen.getByRole("tab", { name: "工作流" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "团队" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -471,11 +443,11 @@ describe("AI 团队中心主流程", () => {
     await user.click(
       await screen.findByRole("button", { name: "查看 AI 团队 交互测试团队" }),
     );
-    await user.click(await screen.findByRole("tab", { name: "工作流" }));
+    await user.click(await screen.findByRole("tab", { name: "团队" }));
     await user.click(screen.getByRole("tab", { name: "对话" }));
     window.history.back();
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: "工作流" })).toHaveAttribute(
+      expect(screen.getByRole("tab", { name: "团队" })).toHaveAttribute(
         "aria-selected",
         "true",
       ),

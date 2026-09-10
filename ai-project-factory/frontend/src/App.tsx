@@ -14,32 +14,29 @@ import {
   Button,
   Empty,
   Input,
-  Select,
   Spin,
   Tabs,
   Tag,
   Tooltip,
 } from "antd";
 import {
-  ArrowLeftOutlined,
   ArrowRightOutlined,
   CheckOutlined,
   CodeOutlined,
   DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
-  HistoryOutlined,
+  FolderOpenOutlined,
   PlusOutlined,
   RobotOutlined,
   SettingOutlined,
   TeamOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
 const TasksPanel = lazy(() => import("./tasks/TasksPanel"));
 const ProjectChat = lazy(() => import("./chat/ProjectChat"));
+const DashboardPanel = lazy(() => import('./DashboardPanel'));
 import { api } from "./api";
 import WorkspacePage from "./WorkspacePage";
-import EvidencePanel from "./EvidencePanel";
 import type {
   Design,
   Draft,
@@ -51,7 +48,7 @@ import type {
 
 type View = "design" | "employees" | "projects";
 type ProjectTab =
-  "overview" | "conversation" | "plan" | "history" | "evidence" | "tasks";
+  "conversation" | "plan" | "tasks" | "dashboard";
 function readRoute() {
   const [path, query] = window.location.hash.slice(1).split("?");
   const employee = new URLSearchParams(query).get("employee");
@@ -60,7 +57,7 @@ function readRoute() {
     return {
       view: "employees" as View,
       id: null,
-      tab: "overview" as ProjectTab,
+      tab: "conversation" as ProjectTab,
       employee,
     };
   if (parts[0] === "projects" && parts[1])
@@ -69,20 +66,18 @@ function readRoute() {
       id: parts[1] === "new" ? null : parts[1],
       employee,
       tab: ([
-        "overview",
         "conversation",
         "plan",
-        "history",
         "tasks",
-        "evidence",
+        "dashboard",
       ].includes(parts[2])
         ? parts[2]
-        : "overview") as ProjectTab,
+        : "conversation") as ProjectTab,
     };
   return {
     view: "projects" as View,
     id: null,
-    tab: "overview" as ProjectTab,
+    tab: "conversation" as ProjectTab,
     employee: null,
   };
 }
@@ -112,11 +107,12 @@ export default function FactoryApp() {
   const [projectTab, setProjectTab] = useState<ProjectTab>(
     () => readRoute().tab,
   );
+  const [filesOpen, setFilesOpen] = useState(false);
+  const [taskLaunch,setTaskLaunch]=useState<{employee?:string;nonce:number}>();
   const [search, setSearch] = useState("");
   const [design, setDesign] = useState<Design | null>(null);
   const [runtime, setRuntime] = useState<Runtime | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -129,12 +125,6 @@ export default function FactoryApp() {
   const [employeeRouteId, setEmployeeRouteId] = useState(readRoute().employee);
   const [raw, setRaw] = useState<string | null>(null);
   const [rawVersion, setRawVersion] = useState(0);
-  const [history, setHistory] = useState<
-    | { version: number; source: string; created_at: string; draft: Draft }[]
-    | null
-  >(null);
-  const [project, setProject] = useState<Project | null>(null);
-  const [creating, setCreating] = useState(false);
   const requestRef = useRef<{
     id: string;
     content: string;
@@ -146,14 +136,12 @@ export default function FactoryApp() {
   const busy = sending || (!!job && ["queued", "running"].includes(job.status));
 
   const refreshLists = useCallback(async () => {
-    const [d, e, p] = await Promise.all([
+    const [d, e] = await Promise.all([
       api<Design[]>("/workspaces"),
       api<Employee[]>("/employees"),
-      api<Project[]>("/snapshots"),
     ]);
     setDesigns(d);
     setEmployees(e);
-    setProjects(p);
   }, []);
   const refreshDesign = useCallback(async (id: string) => {
     const d = await api<Design>(`/workspaces/${id}`);
@@ -254,31 +242,13 @@ export default function FactoryApp() {
     }
   }
 
-  async function createProject() {
-    if (!design || creating) return;
-    setCreating(true);
-    try {
-      const p = await api<Project>(`/workspaces/${design.id}/snapshots`, {
-        method: "POST",
-        body: JSON.stringify({ expected_version: design.version }),
-      });
-      await refreshLists();
-      setProject(p);
-      message.success("方案快照已保存，可在本AI 团队历史中查看");
-    } catch (e) {
-      message.error((e as Error).message);
-    } finally {
-      setCreating(false);
-    }
-  }
-
   const editorDirty = useRef(false);
   const routeRef = useRef(window.location.hash || "#/projects");
   const scrollPositions = useRef(new Map<string, number>());
   function navigate(
     nextView: View,
     id: string | null,
-    tab: ProjectTab = "overview",
+    tab: ProjectTab = "conversation",
     replace = false,
     employeeId: string | null = null,
   ) {
@@ -297,6 +267,7 @@ export default function FactoryApp() {
     setView(nextView);
     setActive(id);
     setProjectTab(tab);
+    if (tab !== "tasks") setTaskLaunch(undefined);
     setEmployeeRouteId(employeeId);
     if (activeRef.current !== id) {
       setText("");
@@ -342,8 +313,6 @@ export default function FactoryApp() {
       const proceed = () => {
         setEditor(null);
         setRaw(null);
-        setHistory(null);
-        setProject(null);
         editorDirty.current = false;
         navigate(target.view, target.id, target.tab, true, target.employee);
       };
@@ -387,7 +356,7 @@ export default function FactoryApp() {
   function navigateFromPage(event: React.MouseEvent<HTMLElement>) {
     if (
       navigationBypass.current ||
-      (!editor && !project && history === null && raw === null)
+      (!editor && raw === null)
     )
       return;
     const target = (event.target as HTMLElement).closest<HTMLElement>(
@@ -398,8 +367,6 @@ export default function FactoryApp() {
     event.stopPropagation();
     const proceed = () => {
       setEditor(null);
-      setProject(null);
-      setHistory(null);
       setRaw(null);
       editorDirty.current = false;
       navigationBypass.current = true;
@@ -452,19 +419,13 @@ export default function FactoryApp() {
             AI 工作室<small>AI STUDIO</small>
           </div>
         </a>
-        <div className="workspace-label">
-          <span className="workspace-icon">B</span>
-          <div>
-            我的工作空间<small>本地开发版</small>
-          </div>
-          <span className="tiny-dot" />
-        </div>
+        <button className="sidebar-create-team" aria-label="新建团队" title="新建团队" onClick={() => {
+          setText(""); navigate("design", null, "conversation");
+        }}><PlusOutlined /><span>新建团队</span></button>
         <section className="sidebar-teams" aria-label="AI 团队列表">
           <div className="sidebar-teams-heading">
             <span>我的 AI 团队</span>
-            <button aria-label="添加团队" title="添加团队" onClick={() => {
-              setText(""); navigate("design", null, "conversation");
-            }}><PlusOutlined /></button>
+
           </div>
           <div className="sidebar-team-list">
             {designs.map((team) => (
@@ -513,23 +474,6 @@ export default function FactoryApp() {
       </aside>
 
       <main className="main">
-        <header className="topbar">
-          <div>
-            <span className="breadcrumb">工作台</span>
-            <span className="slash">/</span>
-            {view === "employees" ? "员工" : "AI 团队"}
-            {view === "design" && (
-              <>
-                <span className="slash">/</span>
-                {active ? design?.title || "正在加载" : "新建AI 团队"}
-              </>
-            )}
-          </div>
-          <span className="local-badge">
-            <span className="tiny-dot" /> LOCAL WORKSPACE{" "}
-            <span className="version">v0.1</span>
-          </span>
-        </header>
         {(error || syncError) && (
           <Alert
             className="global-error"
@@ -652,193 +596,39 @@ export default function FactoryApp() {
               </div>
             ) : (
               <>
-                <div className="design-heading">
-                  <div>
-                    <div className="eyebrow small">PROJECT WORKSPACE</div>
-                    <h2>
-                      {design.title}{" "}
-                      <Tag
-                        bordered={false}
-                        color={design.draft.ready ? "green" : "default"}
-                      >
-                        {design.draft.ready ? "方案已形成" : "筹备中"}
-                      </Tag>
-                    </h2>
-                  </div>
-                  <div className="header-actions">
-                    <Button
-                      icon={<ArrowLeftOutlined />}
-                      onClick={() => navigate("projects", null)}
-                    >
-                      所有AI 团队
-                    </Button>
-                  </div>
-                </div>
+                <div className="project-navigation">
                 <Tabs
                   className="project-tabs"
+                  tabBarExtraContent={projectTab === "conversation" ? <Button
+                    type={filesOpen ? "primary" : "text"}
+                    icon={<FolderOpenOutlined />}
+                    aria-label={filesOpen ? "收起文件" : "展开文件"}
+                    aria-expanded={filesOpen}
+                    onClick={() => setFilesOpen(value => !value)}
+                  >文件</Button> : undefined}
                   activeKey={projectTab}
                   onChange={(key) =>
                     navigate("design", active, key as ProjectTab)
                   }
                   items={[
-                    { key: "overview", label: "概览" },
                     { key: "conversation", label: "对话" },
-                    { key: "plan", label: "工作流" },
+                    { key: "plan", label: "团队" },
                     { key: "tasks", label: "任务与运行" },
-                    { key: "history", label: "版本记录" },
-                    { key: "evidence", label: "资料与评估" },
+                    { key: "dashboard", label: "看板" },
                   ]}
                 />
+                </div>
+                {projectTab === 'dashboard' && <Suspense fallback={<Spin/>}><DashboardPanel key={design.id} projectId={design.id} onCustomize={askProject}/></Suspense>}
                 {projectTab === "tasks" && (
                   <>
-                    <RunPreparation
-                      draft={design.draft as Draft}
-                      onQuestion={askProject}
-                    />
                     <Suspense fallback={<Spin />}>
                       <TasksPanel
                         key={design.id}
                         projectId={design.id}
-                        onSources={() =>
-                          navigate("design", design.id, "evidence")
-                        }
+                        launchEmployee={taskLaunch}
                       />
                     </Suspense>
                   </>
-                )}
-                {projectTab === "evidence" && (
-                  <EvidencePanel
-                    key={design.id}
-                    projectId={design.id}
-                    version={design.version}
-                    onImprove={askProject}
-                  />
-                )}
-                {projectTab === "overview" && (
-                  <section className="project-overview">
-                    <div className="project-intro">
-                      <span className="section-kicker">AI 团队目标</span>
-                      <h2>
-                        {design.draft.goal || "通过对话补充你希望交付的成果"}
-                      </h2>
-                      <p>
-                        对话、团队和工作流保存在这个AI 团队中，修改后无需重新创建AI 团队。
-                      </p>
-                      <Button
-                        type="primary"
-                        onClick={() =>
-                          navigate("design", active, "conversation")
-                        }
-                      >
-                        {design.draft.name ? "继续讨论AI 团队" : "开始完善方案"}
-                        <ArrowRightOutlined />
-                      </Button>
-                      {design.draft.name && (
-                        <Button
-                          onClick={() => navigate("design", active, "plan")}
-                        >
-                          查看与编辑方案
-                        </Button>
-                      )}
-                    </div>
-                    <div className="project-metrics">
-                      <div>
-                        <strong>{design.draft.members?.length || 0}</strong>
-                        <span>团队岗位</span>
-                      </div>
-                      <div>
-                        <strong>{design.draft.workflow?.length || 0}</strong>
-                        <span>工作步骤</span>
-                      </div>
-                      <div>
-                        <strong>
-                          {(design.draft.questions?.length || 0) +
-                            (design.draft.requirements?.length || 0)}
-                        </strong>
-                        <span>待澄清与依赖</span>
-                      </div>
-                    </div>
-                    <div className="project-readiness">
-                      <h3>下一步</h3>
-                      <p>
-                        {!design.draft.name
-                          ? "直接告诉 Codex 你的目标，让它生成或调整团队和工作流。"
-                          : "检查团队职责、工作交接和验收条件，再补齐运行依赖。"}
-                      </p>
-                      {(design.draft.questions || []).map((q) => (
-                        <Button
-                          key={q}
-                          onClick={() => askProject(q + "\n我的回答：")}
-                        >
-                          {q}
-                          <ArrowRightOutlined />
-                        </Button>
-                      ))}
-                      <Alert
-                        type="info"
-                        showIcon
-                        message="当前可完成AI 团队筹备与员工工程编辑"
-                        description="资料与评估中可运行需求分析、基线测试及员工自动研发；完整工作流调度、端到端和部署执行仍待接入。"
-                      />
-                    </div>
-                  </section>
-                )}
-                {projectTab === "history" && (
-                  <section className="project-history">
-                    <div className="project-history-heading">
-                      <div>
-                        <h3>方案版本与快照</h3>
-                        <p>
-                          快照固定保存当时的团队与员工工程，后续编辑不影响历史内容。
-                        </p>
-                      </div>
-                      <Button
-                        disabled={!design.draft.ready}
-                        loading={creating}
-                        onClick={() => void createProject()}
-                      >
-                        保存方案快照
-                      </Button>
-                    </div>
-                    <Button
-                      icon={<HistoryOutlined />}
-                      onClick={() =>
-                        api<typeof history>(
-                          `/workspaces/${design.id}/revisions`,
-                        )
-                          .then(setHistory)
-                          .catch((e) => message.error(e.message))
-                      }
-                    >
-                      查看修订记录
-                    </Button>
-                    <div className="snapshot-list">
-                      {projects.filter((p) => p.design_id === active).length ? (
-                        projects
-                          .filter((p) => p.design_id === active)
-                          .map((p) => (
-                            <button
-                              className="snapshot-row"
-                              key={p.id}
-                              onClick={() => setProject(p)}
-                            >
-                              <div>
-                                <strong>方案修订 {p.design_version}</strong>
-                                <p>
-                                  {p.title} ·{" "}
-                                  {new Date(p.created_at).toLocaleString()}
-                                </p>
-                              </div>
-                              <span>
-                                查看快照 <ArrowRightOutlined />
-                              </span>
-                            </button>
-                          ))
-                      ) : (
-                        <Empty description="尚无固定快照，AI 团队修改会自动保留修订记录" />
-                      )}
-                    </div>
-                  </section>
                 )}
                 <div
                   hidden={
@@ -850,26 +640,11 @@ export default function FactoryApp() {
                     hidden={projectTab !== "conversation"}
                     className={`chat-panel codex-chat-panel ${projectTab !== "conversation" ? "is-hidden" : ""}`}
                   >
-                    <div className="panel-heading">
-                      <span>
-                        <span className="assistant-icon">✳</span> AI 团队助手
-                      </span>
-                      <div>
-                        <small>对话自动保存</small>
-                        {design.draft.name && (
-                          <Button
-                            type="link"
-                            onClick={() => navigate("design", active, "plan")}
-                          >
-                            查看方案 <ArrowRightOutlined />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
                     <Suspense fallback={<Spin tip="正在加载对话" />}>
                       <ProjectChat
                         key={design.id}
                         workspaceId={design.id}
+                        filesOpen={filesOpen}
                         employees={design.employees}
                         employeeReference={employeeReference}
                         onReferenceChange={setEmployeeReference}
@@ -906,31 +681,7 @@ export default function FactoryApp() {
                           });
                           await refreshDesign(design.id);
                         }}
-                        onBuild={async (goal) => {
-                          setSending(true);
-                          setError("");
-                          try {
-                            await api(
-                              `/workspaces/${design.id}/delivery-runs`,
-                              {
-                                method: "POST",
-                                body: JSON.stringify({
-                                  goal,
-                                  max_attempts: 2,
-                                  offline: false,
-                                }),
-                              },
-                            );
-                            await refreshDesign(design.id);
-                            navigate("design", design.id, "evidence");
-                            return true;
-                          } catch (e) {
-                            setError((e as Error).message);
-                            return false;
-                          } finally {
-                            setSending(false);
-                          }
-                        }}
+
                       />
                     </Suspense>
                   </section>
@@ -943,7 +694,7 @@ export default function FactoryApp() {
                         <div className="empty-orbit">
                           <TeamOutlined />
                         </div>
-                        <h3>工作流正在构思中</h3>
+                        <h3>团队正在构思中</h3>
                         <p>
                           聊清目标后，员工与协作关系
                           <br />
@@ -955,6 +706,10 @@ export default function FactoryApp() {
                         draft={design.draft as Draft}
                         onEmployee={openEmployee}
                         onQuestion={askProject}
+                        onRun={(employee) => {
+                          setTaskLaunch({employee,nonce:Date.now()});
+                          navigate("design",design.id,"tasks");
+                        }}
                       />
                     )}
                   </section>
@@ -1108,6 +863,12 @@ export default function FactoryApp() {
             editorDirty.current = dirty;
           }}
           onClose={closeEditor}
+          onRun={() => {
+            const selected=editor;
+            setEditor(null);editorDirty.current=false;
+            setTaskLaunch({employee:selected.profile.key,nonce:Date.now()});
+            navigate("design",selected.design_id,"tasks");
+          }}
           onDiscuss={() => {
             const selected = editor;
             setEditor(null);
@@ -1160,59 +921,7 @@ export default function FactoryApp() {
           onChange={(e) => setRaw(e.target.value)}
         />
       </WorkspacePage>
-      <WorkspacePage
-        title="方案修订历史"
-        open={history !== null}
-        onClose={() => setHistory(null)}
-      >
-        {history?.length ? (
-          history.map((r) => (
-            <div className="revision" key={r.version}>
-              <Tag>修订 {r.version}</Tag>
-              <small>
-                {r.source === "codex" ? "Codex 生成" : "手动修改"} ·{" "}
-                {new Date(r.created_at).toLocaleString()}
-              </small>
-              <h3>{r.draft.name}</h3>
-              <p>{r.draft.goal}</p>
-              <span>
-                {r.draft.members.length} 个岗位 · {r.draft.workflow.length}{" "}
-                个节点
-              </span>
-            </div>
-          ))
-        ) : (
-          <Empty description="尚无修订" />
-        )}
-      </WorkspacePage>
-      <WorkspacePage
-        title={project ? `${project.title} · 历史快照` : "历史快照"}
-        open={!!project}
-        onClose={() => setProject(null)}
-      >
-        {project && (
-          <>
-            <Alert
-              type="success"
-              showIcon
-              message={`已保存团队修订 ${project.design_version} 的独立快照`}
-              description="后续修改本AI 团队的方案和员工，不会改变这个历史快照。"
-            />
-            <ProjectDetails
-              project={project}
-              onEditTeam={(question) => {
-                setProject(null);
-                navigate(
-                  "design",
-                  project.design_id,
-                  question ? "conversation" : "plan",
-                );
-                setText(question ?? "");
-              }}
-            />
-          </>
-        )}
-      </WorkspacePage>
+
     </div>
   );
 }
@@ -1361,10 +1070,12 @@ function WorkflowPreview({
   draft,
   onEmployee,
   onQuestion,
+  onRun,
 }: {
   draft: Draft;
   onEmployee?: (m: Member) => void;
   onQuestion?: (q: string) => void;
+  onRun?: (employee?: string) => void;
 }) {
   return (
     <div className="team-preview">
@@ -1372,6 +1083,7 @@ function WorkflowPreview({
         draft={draft}
         onEmployee={onEmployee}
         onQuestion={onQuestion}
+        onRun={onRun}
       />
     </div>
   );
@@ -1465,11 +1177,13 @@ export function EmployeeEditor({
   onSave,
   onDirtyChange,
   onDiscuss,
+  onRun,
 }: {
   employee: Employee;
   projectTitle?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onDiscuss?: () => void;
+  onRun?: () => void;
   onClose: () => void;
   onSave: (e: Employee) => Promise<void>;
 }) {
@@ -1529,6 +1243,7 @@ export function EmployeeEditor({
       onClose={close}
       extra={
         <div style={{ display: "flex", gap: 8 }}>
+          {onRun && <Button disabled={dirty||saving} onClick={onRun}>单独执行</Button>}
           {onDiscuss && (
             <Button
               disabled={dirty || saving}

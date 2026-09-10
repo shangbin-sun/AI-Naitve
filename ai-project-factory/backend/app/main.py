@@ -28,6 +28,7 @@ from .delivery import install_delivery
 from .tasks import install_tasks
 from .chat_attachments import install_chat_attachments, message_attachments, bind_attachments
 from .workspaces import Workspaces
+from .dashboards import DashboardService, install_dashboards
 from .agent_runs import AgentRuns, install_agent_runs
 from .workspace_browser import install_workspace_browser
 
@@ -63,6 +64,7 @@ def create_app(settings=None, runtime=None):
     agent_runs = AgentRuns(sessions, settings, workspaces)
     project_tools = ProjectTools(sessions, manager, evidence)
     project_tools.agent_runs = agent_runs
+    dashboards = DashboardService(sessions, agent_runs)
     if isinstance(runtime, CodexRuntime):
         runtime.project_tools = project_tools
         runtime.workspaces = workspaces
@@ -84,6 +86,8 @@ def create_app(settings=None, runtime=None):
     app.state.manager = manager
     app.state.evidence = evidence
     app.state.project_tools = project_tools
+    app.state.dashboards = dashboards
+    install_dashboards(app, dashboards)
     app.state.agent_runs = agent_runs
     install_agent_runs(app, agent_runs)
     install_workspace_browser(app, workspaces, agent_runs)

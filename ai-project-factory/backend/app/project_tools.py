@@ -7,7 +7,7 @@ import asyncio
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from .models import Design, Employee, Evaluation, Job, ChatOperation, ToolOperation, Source
+from .models import Employee, Evaluation, Job, ChatOperation, ToolOperation, Source
 from .schemas import EditEmployee, Draft
 from .collaboration import human_support
 from .service import edit_employee, apply_draft, get_design
@@ -83,6 +83,10 @@ class ProjectTools:
                 if not job or job.status != 'running' or not operation or operation.mode != 'chat':
                     raise HTTPException(409, '本轮已停止或不允许工具操作')
                 design = get_design(db, project)
+                if action == 'get_dashboard':
+                    from .dashboards import current_dashboard, SaveDashboard
+                    return {'dashboard':current_dashboard(db,project),'contract':SaveDashboard.model_json_schema(),
+                            'instructions':'生成 index.html 和包内 JS/CSS，数据从 window.DASHBOARD_DATA 读取。仅展示与筛选，不访问网络、主页面、文件系统或业务写接口。data_node 留空时使用 {run:{id,title,status},nodes:[{key,name,employee,status,artifacts}]}；自定义数据需指定节点 key 与其登记的 JSON 输出文件名。样例数据必须明确标为配置预览。不要改动现有规则、技能、员工文件或运行数据。'}
                 if action == 'get_project_overview':
                     employees = list(db.scalars(select(Employee).where(Employee.design_id == project, Employee.active.is_(True))))
                     return {'id': project, 'version': design.version, 'draft': design.draft, 'human_support': human_support(design.draft),
@@ -121,7 +125,7 @@ class ProjectTools:
                         return self.agent_runs.describe(task, run)
                     run = self.run(db, project, args['run_id'])
                     return {**record(run), 'inputs': {k:v for k,v in run.inputs.items() if k not in ('files', 'sources')}}
-                if action not in ('update_employee', 'apply_team_changes', 'evaluate_employee'):
+                if action not in ('update_employee', 'apply_team_changes', 'evaluate_employee', 'save_dashboard'):
                     raise HTTPException(422, '未知AI 团队工具')
                 request_id = args.get('request_id', '')
                 if not isinstance(request_id, str) or not 1 <= len(request_id) <= 100:
@@ -132,7 +136,10 @@ class ProjectTools:
                 if prior:
                     if prior.fingerprint != fingerprint: raise HTTPException(409, 'request_id 已用于不同参数')
                     return prior.result
-                if action == 'update_employee':
+                if action == 'save_dashboard':
+                    from .dashboards import SaveDashboard, save_dashboard
+                    result = save_dashboard(db,project,SaveDashboard.model_validate({k:v for k,v in args.items() if k!='request_id'}))
+                elif action == 'update_employee':
                     employee = self.employee(db, project, args['employee_id'])
                     if design.version != args['expected_project_version']:
                         raise HTTPException(409, 'AI 团队已修改，请重新读取最新配置')

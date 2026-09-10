@@ -6,14 +6,13 @@ import signal
 import tempfile
 from pathlib import Path
 
-from .schemas import DesignResponse
 
 
 SYSTEM = """你是 AI AI 团队工厂的团队设计助手。通过中文对话帮助用户设计适用于任意领域的团队。
 返回符合提供 schema 的 JSON：先输出 reply 给用户自然中文回复，再输出 draft。
 普通问候、致谢、能力介绍、解释已有方案且无需修改时，draft 必须为 null，不要复制或重建方案。
 用户提出AI 团队目标、补充需求或要求修改方案时，draft 必须是完整最新方案；不得只回复承诺而遗漏方案更新。
-团队包括 AI 和人类。流程 owner 必须引用成员 key，depends_on 只能引用存在节点，禁止循环。
+团队包括 AI 和人类。一个员工只对应一个工作流节点，owner 不得重复，内部步骤写在该节点说明中。流程 owner 必须引用成员 key，depends_on 只能引用存在节点，禁止循环。
 优先提出可用方案，reply每轮最多追问3个关键问题，draft.questions必须保留全部尚未解决的已知疑问，不得为控制追问数量丢弃问题。只要目标、基本岗位与主要流程清楚，ready=true，自动生成可编辑草稿；
 未配置真实工具、凭据、数据和环境不阻塞草稿，将它们列入 requirements，说明是否阻塞实际执行。
 保留已有 key，只修改用户要求的部分，尤其保留用户手工完善的员工 instructions 和职责。
@@ -75,8 +74,8 @@ class CodexRuntime:
                         'FACTORY_TOOL_PROJECT': context['project_id'],
                         'FACTORY_TOOL_TOKEN': tools.token(context['project_id'])},
                 'enabled': True, 'required': True,
-                'enabled_tools': ['feishu_desktop', 'get_project_overview', 'get_employee', 'get_team_schema', 'get_source', 'list_runs', 'get_run', 'run_task', 'update_employee', 'apply_team_changes', 'evaluate_employee'],
-                'tools': {name: {'approval_mode': 'approve'} for name in ['feishu_desktop', 'get_project_overview', 'get_employee', 'get_team_schema', 'get_source', 'list_runs', 'get_run', 'run_task', 'update_employee', 'apply_team_changes', 'evaluate_employee']},
+                'enabled_tools': ['get_dashboard', 'save_dashboard', 'feishu_desktop', 'get_project_overview', 'get_employee', 'get_team_schema', 'get_source', 'list_runs', 'get_run', 'run_task', 'update_employee', 'apply_team_changes', 'evaluate_employee'],
+                'tools': {name: {'approval_mode': 'approve'} for name in ['get_dashboard', 'save_dashboard', 'feishu_desktop', 'get_project_overview', 'get_employee', 'get_team_schema', 'get_source', 'list_runs', 'get_run', 'run_task', 'update_employee', 'apply_team_changes', 'evaluate_employee']},
                 'startup_timeout_sec': 15, 'tool_timeout_sec': 60,
             }
         try:
