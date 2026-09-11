@@ -197,3 +197,79 @@ def test_organization_rules_change_new_snapshot_only(manager, monkeypatch):
     assert first['snapshot']['digest'] != second['snapshot']['digest']
     assert 'New organization rule' not in Path(first['snapshot']['path'], 'AGENTS.md').read_text()
     assert 'New organization rule' in Path(second['snapshot']['path'], 'AGENTS.md').read_text()
+
+
+def test_warning_is_nonblocking_and_failed_attempt_can_finish(manager):
+    run = create(manager, 'node'); active(manager, run)
+    begun = control(manager, run, 'begin', node='analyze')
+    warning = control(manager, run, 'warning', node='analyze', note='临时写入失败，已恢复')
+    assert warning['status'] == 'preparing' and not warning.get('error')
+    assert warning['warnings'][0]['note'] == '临时写入失败，已恢复'
+    child(manager, run)
+    control(manager, run, 'fail', node='analyze', note='曾经写入失败')
+    with pytest.raises(ValueError, match='实际派生'):
+        control(manager, run, 'finish', node='analyze', thread_id='forged', artifacts=['result.txt'])
+    with pytest.raises(ValueError, match='不存在'):
+        control(manager, run, 'finish', node='analyze', thread_id='child', artifacts=['result.txt'])
+    assert control(manager, run, 'state')['state']['nodes']['analyze']['status'] == 'failed'
+    (Path(begun['attempt_path'])/'outputs/result.txt').write_text('verified result')
+    finished = control(manager, run, 'finish', node='analyze', thread_id='child', artifacts=['result.txt'], verification='核查文档')
+    assert finished['status'] == 'completed' and not finished.get('error')
+    assert finished['attempt'] == begun['attempt']
+    assert finished['warnings'][-1]['resolved'] is True
+
+
+def test_failure_does_not_prevent_late_child_binding_or_bypass_human(manager):
+    run = create(manager, 'node'); active(manager, run)
+    control(manager, run, 'begin', node='analyze')
+    control(manager, run, 'fail', node='analyze', note='临时问题')
+    child(manager, run)
+    assert control(manager, run, 'state')['state']['nodes']['analyze']['thread_id'] == 'child'
+    result = control(manager, run, 'human', node='analyze', question='需要选择运行平台')
+    assert not result.get('error')
+    with pytest.raises(ValueError, match='人工问题'):
+        control(manager, run, 'finish', node='analyze', thread_id='child', artifacts=['result.txt'])
+    with pytest.raises(ValueError, match='人工问题'):
+        control(manager, run, 'begin', node='analyze')
+
+
+def test_begin_clears_failure_without_replacing_attempt(manager):
+    run = create(manager, 'node'); active(manager, run)
+    first = control(manager, run, 'begin', node='analyze'); child(manager, run)
+    control(manager, run, 'fail', node='analyze', note='修复中')
+    resumed = control(manager, run, 'begin', node='analyze')
+    assert resumed['attempt'] == first['attempt'] and resumed['thread_id'] == 'child'
+    assert resumed['status'] == 'running' and not resumed.get('error') and not resumed.get('finished_at')
+
+
+def test_failed_run_resume_preserves_attempt_and_child(manager, monkeypatch):
+    from fastapi.testclient import TestClient
+    run = create(manager, 'node'); active(manager, run)
+    original = control(manager, run, 'begin', node='analyze'); child(manager, run)
+    control(manager, run, 'fail', node='analyze', note='等待修复')
+    with manager.sessions.begin() as db: db.get(AgentRun, run['id']).status = 'failed'
+    launched = []
+    monkeypatch.setattr(manager, 'launch', lambda project, identity: launched.append(identity))
+    client = TestClient(manager.app)
+    response = client.post(f"/api/workspaces/{manager.project_id}/agent-runs/{run['id']}/resume")
+    assert response.status_code == 200, response.text
+    assert launched == [run['id']]
+    with manager.sessions() as db:
+        stored = db.get(AgentRun, run['id'])
+        assert stored.thread_id == 'parent'
+        assert stored.state['nodes']['analyze']['attempt'] == original['attempt']
+        assert stored.state['nodes']['analyze']['thread_id'] == 'child'
+
+
+def test_preparing_until_real_child_start(manager):
+    run = create(manager, 'node'); active(manager, run)
+    begun = control(manager, run, 'begin', node='analyze')
+    assert begun['status'] == 'preparing' and begun['preparing_at']
+    assert not begun.get('started_at')
+    control(manager, run, 'progress', node='analyze', note='资料已准备')
+    assert control(manager, run, 'state')['state']['nodes']['analyze']['status'] == 'preparing'
+    manager.notification(manager.project_id, run['id'], {'method':'item/completed', 'params':{
+        'threadId':'parent','item':{'type':'subAgentActivity','agentThreadId':'native-child','agentPath':'/root/analyze','kind':'started'}}})
+    started = control(manager, run, 'state')['state']['nodes']['analyze']
+    assert started['status'] == 'running' and started['started_at']
+    assert started['thread_id'] == 'native-child'

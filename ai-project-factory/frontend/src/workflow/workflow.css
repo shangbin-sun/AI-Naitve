@@ -1,5 +1,5 @@
 .employee-workflow {
-  color: #334269;
+  color: var(--text-body);
 }
 .employee-workflow-heading {
   display: flex;
@@ -11,11 +11,11 @@
 .employee-workflow-heading h3 {
   font-size: 18px;
   margin: 0 0 6px;
-  color: #27354c;
+  color: var(--text-body);
 }
 .employee-workflow-heading p {
   margin: 0;
-  color: #748198;
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -23,14 +23,14 @@
   border: 0;
   padding: 4px 0;
   background: transparent;
-  color: #5968b8;
+  color: var(--text-action);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 .workflow-text-button:hover {
-  color: #3349a9;
+  color: var(--text-action);
 }
 .workflow-layer-label {
   display: flex;
@@ -38,11 +38,11 @@
   gap: 12px;
   font-size: 12px;
   font-weight: 600;
-  color: #53627c;
+  color: var(--text-secondary);
   margin-bottom: 12px;
 }
 .workflow-layer-label > span {
-  color: #8390a2;
+  color: var(--text-muted);
   font-weight: 400;
 }
 .workflow-human-row {
@@ -74,14 +74,14 @@
   height: 36px;
   align-items: center;
   justify-content: center;
-  background: #eef1fe;
-  color: #6878ca;
+  background: var(--role-ai-bg);
+  color: var(--role-ai);
   border-radius: 11px;
   font-size: 18px;
 }
 .workflow-avatar.human {
-  color: #a38553;
-  background: #f4eee1;
+  color: var(--role-human);
+  background: var(--role-human-bg);
 }
 .workflow-card-content {
   min-width: 0;
@@ -92,15 +92,15 @@
 .workflow-card-content strong {
   font-size: 14px;
   padding-right: 65px;
-  color: #344057;
+  color: var(--text-body);
 }
 .workflow-card-content > span {
   font-size: 12px;
-  color: #738097;
+  color: var(--text-muted);
   line-height: 1.7;
 }
 .workflow-card-content small {
-  color: #8d806a;
+  color: var(--role-human);
   font-size: 11px;
 }
 .workflow-default-badge {
@@ -108,8 +108,8 @@
   right: 12px;
   top: 14px;
   font-size: 10px;
-  color: #998059;
-  background: #f5efdf;
+  color: var(--role-human);
+  background: var(--role-human-bg);
   padding: 3px 6px;
   border-radius: 5px;
 }
@@ -119,7 +119,7 @@
   justify-content: center;
   gap: 8px;
   padding: 24px 0;
-  color: #9aa4b7;
+  color: var(--text-muted);
   font-size: 11px;
 }
 .workflow-ai-row {
@@ -134,7 +134,7 @@
   flex: 1 0 240px;
   max-width: 340px;
   min-width: 0;
-  border: 1px solid #e0e5ef;
+  border: 1px solid var(--border);
   border-radius: 14px;
   background: #fff;
   color: inherit;
@@ -150,12 +150,12 @@
   align-items: center;
   gap: 10px;
   font-size: 14px;
-  color: #2d3b55;
+  color: var(--text-body);
 }
 .workflow-ai-card p {
   font-size: 12px;
   line-height: 1.8;
-  color: #738097;
+  color: var(--text-muted);
   margin: 16px 0;
   flex: 1;
 }
@@ -164,10 +164,10 @@
   justify-content: space-between;
   gap: 12px;
   font-size: 11px;
-  color: #8d98aa;
+  color: var(--text-muted);
 }
 .workflow-card-meta > span {
-  color: #7480b6;
+  color: var(--text-muted);
 }
 .workflow-human-target {
   display: block;
@@ -175,7 +175,7 @@
   margin-top: 16px;
   padding-top: 12px;
   font-size: 11px;
-  color: #7b879c;
+  color: var(--text-muted);
 }
 .workflow-human-card:hover,
 .workflow-ai-card:hover {
@@ -183,11 +183,11 @@
 }
 .workflow-human-card.selected,
 .workflow-ai-card.selected {
-  border-color: #8190d2;
-  box-shadow: 0 0 0 2px #8190d218;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 .employee-workflow button:focus-visible {
-  outline: 2px solid #8190d2;
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 .workflow-handoffs {
@@ -196,22 +196,22 @@
   align-items: center;
   gap: 8px 12px;
   font-size: 11px;
-  color: #8390a2;
+  color: var(--text-muted);
   margin-top: 4px;
 }
 .workflow-handoff {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #65738c;
-  background: #edf1f8;
+  color: var(--text-secondary);
+  background: var(--primary-soft);
   border-radius: 7px;
   padding: 6px 9px;
 }
 .workflow-detail {
   margin-top: 22px;
   padding: 22px;
-  border: 1px solid #e0e5ef;
+  border: 1px solid var(--border);
   border-radius: 14px;
   background: #fff;
 }
@@ -222,7 +222,7 @@
   gap: 12px;
 }
 .workflow-detail > p {
-  color: #738097;
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.8;
 }
@@ -240,8 +240,8 @@
 .workflow-assigned span {
   font-size: 12px;
   padding: 5px 9px;
-  color: #6777a8;
-  background: #f0f3fb;
+  color: var(--text-muted);
+  background: var(--primary-soft);
   border-radius: 6px;
 }
 .workflow-contract {
@@ -252,19 +252,19 @@
 }
 .workflow-contract span {
   font-size: 11px;
-  color: #8390a2;
+  color: var(--text-muted);
 }
 .workflow-contract p {
   margin: 6px 0;
   font-size: 13px;
   line-height: 1.8;
-  color: #5b6980;
+  color: var(--text-secondary);
 }
 .workflow-internal-steps {
   margin-top: 18px;
   border-top: 1px solid #edf0f5;
   font-size: 12px;
-  color: #738097;
+  color: var(--text-muted);
 }
 .workflow-internal-steps summary {
   cursor: pointer;
@@ -274,7 +274,7 @@
   padding: 8px 0;
 }
 .workflow-internal-steps h4 {
-  color: #43516a;
+  color: var(--text-body);
   font-size: 13px;
 }
 .workflow-internal-steps dl {
@@ -290,7 +290,7 @@
 .workflow-empty {
   padding: 24px 0;
   font-size: 13px;
-  color: #8390a2;
+  color: var(--text-muted);
 }
 @media (max-width: 700px) {
   .employee-workflow-heading {
@@ -318,7 +318,7 @@
 .workflow-human-questions {
   margin: 18px 0;
   font-size: 12px;
-  color: #6b7890;
+  color: var(--text-secondary);
 }
 .workflow-human-questions > strong {
   font-weight: 500;
@@ -330,7 +330,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  color: #5968b8;
+  color: var(--text-action);
   background: transparent;
   border: 0;
   border-bottom: 1px solid #edf0f5;
@@ -341,11 +341,11 @@
 
 /* Static canvas: real relationships, fixed node layout, no editor controls. */
 .workflow-canvas {
-  border: 1px solid #e1e6f0;
+  border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
-  background: #f8faff;
-  background-image: radial-gradient(#cdd5e4 1px, transparent 1px);
+  background: var(--surface-subtle);
+  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
   background-size: 18px 18px;
 }
 .workflow-canvas-legend {
@@ -356,7 +356,7 @@
   padding: 16px 20px;
   background: #ffffffcf;
   border-bottom: 1px solid #e8edf5;
-  color: #8591a6;
+  color: var(--text-muted);
   font-size: 11px;
 }
 .workflow-canvas-legend > span {
@@ -370,10 +370,10 @@
 .workflow-canvas-legend i {
   display: inline-block;
   width: 18px;
-  border-top: 2px solid #8997ce;
+  border-top: 2px solid var(--flow-edge);
 }
 .workflow-canvas-legend i.human {
-  border-top: 2px dashed #bca980;
+  border-top: 2px dashed var(--flow-human-edge);
 }
 .workflow-canvas-scroll {
   overflow-x: auto;
@@ -396,11 +396,11 @@
   stroke-width: 1.7;
 }
 .workflow-canvas-lines .human-edge {
-  stroke: #bca980;
+  stroke: var(--flow-human-edge);
   stroke-dasharray: 5 5;
 }
 .workflow-canvas-lines .work-edge {
-  stroke: #8997ce;
+  stroke: var(--flow-edge);
 }
 .workflow-node-row {
   position: absolute;
@@ -428,7 +428,7 @@
   border: 1px solid #dce2ef;
   border-radius: 12px;
   background: #fff;
-  color: #35435b;
+  color: var(--text-body);
   font: inherit;
   cursor: pointer;
   box-shadow: 0 4px 14px #41598108;
@@ -439,13 +439,13 @@
   justify-content: space-between;
   border-radius: 11px 11px 0 0;
   padding: 8px 12px;
-  background: #f0f3ff;
-  color: #7382ba;
+  background: var(--role-ai-bg);
+  color: var(--role-ai);
   font-size: 10px;
 }
 .human-node .workflow-node-type {
-  background: #f7f3e9;
-  color: #9f8960;
+  background: var(--role-human-bg);
+  color: var(--role-human);
 }
 .workflow-node-title {
   display: flex;
@@ -468,7 +468,7 @@
 }
 .workflow-node-description {
   margin: 8px 12px;
-  color: #7d899c;
+  color: var(--text-muted);
   font-size: 11px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -482,36 +482,36 @@
   padding: 10px 12px;
   border-top: 1px solid #edf0f6;
   font-size: 10px;
-  color: #8b97ab;
+  color: var(--text-muted);
 }
 .workflow-node-footer > span {
-  color: #7583b9;
+  color: var(--text-muted);
 }
 .workflow-node:hover {
   border-color: #a0aed8;
   box-shadow: 0 5px 18px #41598112;
 }
 .workflow-node.selected {
-  border-color: #7f90d2;
-  box-shadow: 0 0 0 2px #7f90d21c;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 .workflow-port {
   position: absolute;
   height: 7px;
   width: 7px;
   border-radius: 50%;
-  border: 1.5px solid #91a0cd;
+  border: 1.5px solid var(--flow-edge);
   background: white;
 }
 .workflow-port.top {
   top: -4px;
   left: calc(50% - 4px);
-  border-color: #bca980;
+  border-color: var(--flow-human-edge);
 }
 .workflow-port.bottom {
   bottom: -4px;
   left: calc(50% - 4px);
-  border-color: #bca980;
+  border-color: var(--flow-human-edge);
 }
 .workflow-port.left {
   left: -4px;
@@ -528,7 +528,7 @@
   background: #ffffffb8;
   border-top: 1px solid #e8edf5;
   padding: 12px 20px;
-  color: #8b97ab;
+  color: var(--text-muted);
   font-size: 10px;
 }
 .workflow-canvas-empty {
@@ -538,29 +538,29 @@
   right: 20px;
   text-align: center;
   font-size: 12px;
-  color: #8390a2;
+  color: var(--text-muted);
 }
 .workflow-canvas-stage {
   min-width: 0;
   margin: 0 auto;
 }
 .workflow-canvas-lines marker path {
-  fill: #8997ce;
+  fill: var(--flow-edge);
   stroke: none;
 }
 
 .boundary-node .workflow-node-type {
-  background: #edf5f7;
-  color: #6a929b;
+  background: var(--role-input-bg);
+  color: var(--role-input);
 }
 .boundary-node .workflow-avatar {
-  background: #edf5f7;
-  color: #6a929b;
+  background: var(--role-input-bg);
+  color: var(--role-input);
 }
 .output-node .workflow-node-type,
 .output-node .workflow-avatar {
-  background: #edf6f0;
-  color: #709a81;
+  background: var(--role-output-bg);
+  color: var(--role-output);
 }
 .workflow-canvas-empty {
   top: 210px;
@@ -568,7 +568,15 @@
 
 .workflow-node-shell { position: relative; flex: 0 0 260px; width: 260px; }
  .workflow-node-actions { position: absolute; left: 12px; right: 12px; bottom: 7px; display: flex; gap: 8px; }
-.workflow-node-actions button { flex: 1; border: 0; border-radius: 6px; background: #f4f6fa; color: #65738b; padding: 6px 9px; cursor: pointer; font: inherit; font-size: 12px; }
-.workflow-node-actions button.primary { background: #eef1ff; color: #536bd8; }
-.workflow-node-actions button:hover { background: #dfe5ff; color: #536bd8; }
-.workflow-node-actions button:focus-visible { outline: 2px solid #536bd8; outline-offset: 2px; }
+.workflow-node-actions button { flex: 1; border: 0; border-radius: 6px; background: var(--surface-subtle); color: var(--text-secondary); padding: 6px 9px; cursor: pointer; font: inherit; font-size: 12px; }
+.workflow-node-actions button.primary { background: var(--primary-soft); color: var(--text-action); }
+.workflow-node-actions button:hover { background: var(--primary-soft); color: var(--text-action); }
+.workflow-node-actions button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* Role color stays in compact labels; node bodies remain neutral. */
+.workflow-node-type { background: transparent; }
+.workflow-node-type > span { background: var(--role-ai-bg); color: var(--role-ai); padding: 2px 5px; border-radius: 4px; }
+.human-node .workflow-node-type, .boundary-node .workflow-node-type, .output-node .workflow-node-type { background: transparent; }
+.human-node .workflow-node-type > span { background: var(--role-human-bg); color: var(--role-human); }
+.boundary-node .workflow-node-type > span { background: var(--role-input-bg); color: var(--role-input); }
+.output-node .workflow-node-type > span { background: var(--role-output-bg); color: var(--role-output); }

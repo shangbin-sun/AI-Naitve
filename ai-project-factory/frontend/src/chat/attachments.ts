@@ -21,6 +21,10 @@ const accepted = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 const textTypes: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
   md: "text/markdown",
   markdown: "text/markdown",
   txt: "text/plain",

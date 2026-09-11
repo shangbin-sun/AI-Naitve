@@ -51,3 +51,33 @@ it("员工入口直接进入单员工执行", async () => {
   expect(await screen.findByText("分析员工")).toBeVisible();
   expect(screen.getByText(/缺少的上游输入请在下方补充/)).toBeVisible();
 });
+
+it("新任务默认复用上次团队输入和附件", async () => {
+  const old = {...sample("latest"), inputs:{description:"上次要求", attachments:[{name:"source.txt",path:"inputs/files/source.txt"}]}};
+  mock.mockImplementation(async path => path.endsWith("agent-runs") ? [old] : definition);
+  const fetchMock = vi.spyOn(globalThis,"fetch").mockResolvedValue({ok:true,blob:async()=>new Blob(["data"])} as Response);
+  try {
+    render(<AgentRunsPanel projectId="p" />);
+    await screen.findByRole("button",{name:"销售分析"});
+    await userEvent.click(screen.getByRole("button",{name:/新建任务/}));
+    await waitFor(()=>expect(screen.getByLabelText("任务输入")).toHaveValue("上次要求"));
+    await screen.findByText("source.txt");
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("run_id=latest"));
+    expect(screen.getByRole("combobox", {name:"已上传的文件"})).toBeInTheDocument();
+  } finally {fetchMock.mockRestore();}
+});
+it("员工入口只复用该员工的输入，不继承团队输入", async () => {
+  const own={...sample("employee"),scope:"node",inputs:{node:"a",description:"员工上次输入"},state:{nodes:{a:{step:{key:"a",owner:"analyst",name:"分析"},employee:{key:"analyst",name:"分析员工"},status:"completed",artifacts:[]}}}};
+  mock.mockImplementation(async path=>path.endsWith("agent-runs")?[sample("team"),own]:definition);
+  render(<AgentRunsPanel projectId="p" launchEmployee={{employee:"analyst",nonce:1}} />);
+  await waitFor(()=>expect(screen.getByLabelText("任务输入")).toHaveValue("员工上次输入"));
+});
+
+it("人工节点保持答复入口，不提供员工调优", async () => {
+  mock.mockImplementation(async path => path.endsWith("agent-runs") ? [sample("issue")] : definition);
+  render(<AgentRunsPanel projectId="p"/>);
+  await userEvent.click(await screen.findByRole("button",{name:"销售分析"}));
+  expect(screen.queryByRole("button",{name:"转到聊天处理"})).toBeNull();
+  expect(screen.getByRole("button",{name:"提交答复"})).toBeInTheDocument();
+  expect(mock.mock.calls.some(([,options])=>options?.method==="POST")).toBe(false);
+});

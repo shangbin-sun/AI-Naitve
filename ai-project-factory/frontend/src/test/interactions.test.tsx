@@ -228,15 +228,14 @@ describe("工作台入口", () => {
     expect(screen.queryByText("还没有 AI 团队")).toBeNull();
     expect(screen.getByRole("button", { name: "新建AI团队" })).toBeEnabled();
   });
-  it("首页示例填入输入，发送从禁用变为可用", async () => {
+  it("新建团队必须输入名称，取消不会创建", async () => {
     const user = factory();
     await user.click(screen.getByRole("button", { name: "新建AI团队" }));
-    expect(screen.getByRole("button", { name: /创建AI 团队/ })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: /模型实验团队/ }));
-    expect(
-      (screen.getByLabelText("描述AI 团队目标") as HTMLTextAreaElement).value,
-    ).toContain("模型实验团队");
-    expect(screen.getByRole("button", { name: /创建AI 团队/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "创建团队" })).toBeDisabled();
+    await user.type(screen.getByLabelText("AI团队名称"), "   ");
+    expect(screen.getByRole("button", { name: "创建团队" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: /取\s*消/ }));
+    expect(mocked.mock.calls.some(([p,o])=>p==="/workspaces"&&o?.method==="POST")).toBe(false);
   });
   it("工作流入口打开预选范围的任务启动半窗", async () => {
     const user = factory();
@@ -488,11 +487,10 @@ describe("AI 团队中心主流程", () => {
       return fallback(path, options);
     });
     await user.click(screen.getByRole("button", { name: "新建AI团队" }));
-    await user.type(
-      screen.getByLabelText("描述AI 团队目标"),
-      "训练并评估一个模型",
-    );
-    await user.click(screen.getByRole("button", { name: /创建AI 团队/ }));
+    await user.type(screen.getByLabelText("AI团队名称"), "研发团队");
+    await user.click(screen.getByRole("button", { name: "创建团队" }));
+    await user.type(await screen.findByLabelText("讨论当前AI 团队"), "训练并评估一个模型");
+    await user.click(screen.getByRole("button", { name: "发送" }));
     expect(await screen.findByText("模型服务暂不可用，请重试")).toBeVisible();
     expect(window.location.hash).toBe("#/projects/new-project/conversation");
     expect(screen.getByLabelText("讨论当前AI 团队")).toHaveValue(
@@ -501,8 +499,8 @@ describe("AI 团队中心主流程", () => {
     const creation = mocked.mock.calls.find(
       ([p, o]) => p === "/workspaces" && o?.method === "POST",
     );
-    expect(JSON.parse(creation![1]!.body as string).goal).toBe(
-      "训练并评估一个模型",
+    expect(JSON.parse(creation![1]!.body as string).title).toBe(
+      "研发团队",
     );
     expect(
       mocked.mock.calls.some(
@@ -518,4 +516,46 @@ it("侧栏直接进入具体 AI Team 的对话", async () => {
   await user.click(await screen.findByRole("button", { name: "进入 AI 团队 交互测试团队" }));
   expect(await screen.findByLabelText("讨论当前AI 团队")).toBeVisible();
   expect(window.location.hash).toContain("projects/design-1/conversation");
+});
+
+it("员工对话显示在团队下，关闭只隐藏入口并保留服务端记录", async () => {
+  localStorage.setItem("employee-conversations",JSON.stringify([{projectId:design.id,runId:"run-one",nodeKey:"work",name:"测试分析员"}]));
+  window.history.replaceState(null,"","#/projects/design-1/conversation?tuning=run-one%3Awork");
+  mocked.mockImplementation(async path=>{
+    if(path==="/workspaces")return [design];
+    if(path==="/employees")return [employee];
+    if(path==="/workspaces/design-1")return design;
+    if(path.endsWith("/tuning"))return {status:"completed",messages:[{role:"assistant",content:"已保留调优记录"}],read_only:false,can_start:true};
+    if(path.endsWith("/definition"))return {draft,employees:[employee],sources:[],attachments:[]};
+    if(path.endsWith("/agent-runs")||path.endsWith("/tasks"))return [];
+    return {};
+  });
+  mount(<Factory/>);
+  expect(await screen.findByRole("button",{name:"关闭测试分析员对话"})).toBeInTheDocument();
+  expect(await screen.findByText("已保留调优记录")).toBeVisible();
+  expect(screen.getByRole("button",{name:"添加附件"})).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button",{name:"关闭对话"}));
+  expect(screen.queryByRole("button",{name:"关闭测试分析员对话"})).toBeNull();
+  expect(JSON.parse(localStorage.getItem("employee-conversations")!)).toEqual([]);
+  expect(mocked.mock.calls.some(([,options])=>options?.method==="DELETE"||options?.method==="POST")).toBe(false);
+});
+
+it("从员工对话点击团队名称回到原团队标签", async () => {
+  localStorage.setItem("employee-conversations",JSON.stringify([{projectId:design.id,runId:"run-one",nodeKey:"work",name:"测试分析员"}]));
+  window.history.replaceState(null,"","#/projects/design-1/plan");
+  mocked.mockImplementation(async path=>{
+    if(path==="/workspaces")return [design];
+    if(path==="/employees")return [employee];
+    if(path==="/workspaces/design-1")return design;
+    if(path.endsWith("/tuning"))return {status:"idle",messages:[],read_only:false,can_start:true};
+    return {};
+  });
+  mount(<Factory/>);
+  await screen.findByRole("tab",{name:"团队",selected:true});
+  const sidebar=screen.getByRole("region",{name:"AI 团队列表"});
+  await userEvent.click(within(sidebar).getByRole("button",{name:"robot 测试分析员"}));
+  await screen.findByRole("button",{name:"关闭对话"});
+  await userEvent.click(screen.getByRole("button",{name:"进入 AI 团队 交互测试团队"}));
+  expect(await screen.findByRole("tab",{name:"团队",selected:true})).toBeVisible();
+  expect(screen.queryByRole("button",{name:"关闭对话"})).toBeNull();
 });

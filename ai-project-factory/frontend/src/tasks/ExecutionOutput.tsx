@@ -173,7 +173,7 @@ export default function ExecutionOutput({
       <p className="task-text">
         {executionSummary(summary || fallback, files, root)}
       </p>
-      {error && <Alert type="error" message={cleanOutputText(error, root)} />}
+      {error && ["failed", "interrupted", "cancelled"].includes(status) && <Alert type="error" message={cleanOutputText(error, root)} />}
       <div className="output-files-header">
         <h3>
           输出文件 <small>{files.length}</small>

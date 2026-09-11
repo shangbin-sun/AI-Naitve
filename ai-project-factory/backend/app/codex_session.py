@@ -20,9 +20,23 @@ SKILL_PATH = Path(__file__).parent / 'skills/project-operations/SKILL.md'
 
 
 
+class CodexRPCError(RuntimeError):
+    def __init__(self, error):
+        self.code = error.get('code')
+        self.detail = str(error.get('message', ''))
+        self.input_forbidden = 'direct app-server input is not allowed for multi-agent v2 sub-agents' in self.detail.lower()
+        self.method = None
+        self.parent_required = 'resume the parent first' in self.detail.lower()
+        message = ('原员工子会话不支持直接聊天，需要建立保留历史的续聊会话' if self.input_forbidden else
+                   '员工会话尚未加载，需要先恢复团队主会话' if self.parent_required else
+                   'Codex 请求失败；会话已保留，请稍后重试')
+        super().__init__(message)
+
+
 class CodexConnection:
     def __init__(self, settings):
         self.settings = settings
+        self.process_env = {}
         self.proc = None
         self.reader = None
         self.pending = {}
@@ -46,7 +60,8 @@ class CodexConnection:
             self.proc = await asyncio.create_subprocess_exec(
                 self.settings.codex_bin, 'app-server', '--listen', 'stdio://',
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL, start_new_session=True, limit=4_000_000)
+                stderr=asyncio.subprocess.DEVNULL, start_new_session=True, limit=4_000_000,
+                env={**os.environ, **self.process_env})
             mark('process_spawned')
             self.reader = asyncio.create_task(self._read())
             try:
@@ -82,6 +97,9 @@ class CodexConnection:
         try:
             await self.send({'id': identity, 'method': method, 'params': params})
             return await asyncio.wait_for(future, 30)
+        except CodexRPCError as exc:
+            exc.method = method
+            raise
         finally:
             self.pending.pop(identity, None)
 
@@ -93,7 +111,7 @@ class CodexConnection:
                     future = self.pending.get(event['id'])
                     if future and not future.done():
                         if 'error' in event:
-                            future.set_exception(RuntimeError('Codex 请求失败；请检查会话、登录或模型配置后重试'))
+                            future.set_exception(CodexRPCError(event['error']))
                         else:
                             future.set_result(event.get('result', {}))
                 elif 'id' in event:

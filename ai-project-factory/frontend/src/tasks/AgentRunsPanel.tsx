@@ -25,6 +25,8 @@ import type { WorkTask } from "./types";
 import "./task-center.css";
 import ExecutionOutput from "./ExecutionOutput";
 import ExecutionWorkflow from "./ExecutionWorkflow";
+import AgentActivity from "./AgentActivity";
+import type { EmployeeConversation } from "./EmployeeTuning";
 
 type Artifact = {
   path: string;
@@ -106,6 +108,7 @@ const labels: Record<string, string> = {
   draft: "未开始",
   pending: "未开始",
   queued: "排队中",
+  preparing: "准备中",
   running: "执行中",
   waiting_human: "待处理",
   skipped: "无需处理",
@@ -116,6 +119,7 @@ const labels: Record<string, string> = {
   cancelled: "已停止",
 };
 const colors: Record<string, string> = {
+  preparing: "processing",
   running: "processing",
   waiting_human: "orange",
   skipped: "default",
@@ -156,11 +160,15 @@ function encodeFile(file: Blob): Promise<string> {
 export default function AgentRunsPanel({
   projectId,
   launchEmployee,
+  initialRun,
   onLegacy,
+  onEmployeeChat,
 }: {
   projectId: string;
+  initialRun?: string;
   launchEmployee?: { employee?: string; nonce: number };
   onLegacy?: (id: string) => void;
+  onEmployeeChat?: (conversation: EmployeeConversation) => void;
 }) {
   const base = `/workspaces/${projectId}/agent-runs`;
   const [runs, setRuns] = useState<Run[]>([]),
@@ -169,9 +177,6 @@ export default function AgentRunsPanel({
     [members, setMembers] = useState<
       { key: string; name: string; kind: string }[]
     >([]);
-  const [sources, setSources] = useState<
-    { id: string; title: string; content: string; coverage: string }[]
-  >([]);
   const [selected, setSelected] = useState<string>(),
     [selectedRun, setSelectedRun] = useState<string>();
   const [dataView, setDataView] = useState<"inputs" | "outputs">();
@@ -185,10 +190,10 @@ export default function AgentRunsPanel({
     [rerun, setRerun] = useState<Run>(),
     [scope, setScope] = useState("workflow"),
     [node, setNode] = useState<string>();
-  const [title, setTitle] = useState(""),
-    [description, setDescription] = useState(""),
-    [inputText, setInputText] = useState(""),
-    [acceptance, setAcceptance] = useState("");
+  const [activityNode, setActivityNode] = useState<string>();
+  const [restoring, setRestoring] = useState(false);
+  const restoreVersion = useRef(0);
+  const [description, setDescription] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]),
     [useLatest, setUseLatest] = useState(false);
   const [restartNode, setRestartNode] = useState<string>();
@@ -224,11 +229,6 @@ export default function AgentRunsPanel({
         }
       })
       .catch((e) => alive && setError(String(e)));
-    void api<
-      { id: string; title: string; content: string; coverage: string }[]
-    >(`/workspaces/${projectId}/sources`)
-      .then((d) => alive && setSources(Array.isArray(d) ? d : []))
-      .catch((e) => alive && setError(String(e)));
     if (onLegacy)
       void api<WorkTask[]>(`/workspaces/${projectId}/tasks`)
         .then((d) => alive && setLegacy(Array.isArray(d) ? d : []))
@@ -255,10 +255,7 @@ export default function AgentRunsPanel({
   function newTask(employee?: string) {
     setEditingDraft(undefined);
     setRerun(undefined);
-    setTitle("");
     setDescription("");
-    setInputText("");
-    setAcceptance("");
     setAttachments([]);
     setScope(employee ? "node" : "workflow");
     setNode(employee);
@@ -276,6 +273,26 @@ export default function AgentRunsPanel({
           launchEmployee.employee,
       );
   }, [steps, launchEmployee]);
+  async function readInputFile(source: Run, file: NonNullable<Inputs["attachments"]>[number]): Promise<Attachment> {
+    const response = await fetch(`/api/workspaces/${projectId}/file?run_id=${source.id}&path=${encodeURIComponent(file.path)}&download=true`);
+    if (!response.ok) throw new Error(`无法读取已上传文件：${file.name}`);
+    return {name:file.name, data:await encodeFile(await response.blob())};
+  }
+  useEffect(() => {
+    if (!creating || loading || rerun || editingDraft) return;
+    const version = ++restoreVersion.current;
+    const owner = steps.find(s => s.key === node || s.owner === node)?.owner ?? node;
+    const previous = runs.find(r => r.scope === scope && (scope === "workflow" || (owner && Object.values(r.state.nodes).some(n => n.step.owner === owner || n.employee.key === owner))));
+    setDescription([previous?.inputs?.description, previous?.inputs?.input_text].filter(Boolean).join("\n\n"));
+    setAttachments([]);
+    if (!previous?.inputs?.attachments?.length) {setRestoring(false); return;}
+    setRestoring(true);
+    void Promise.all(previous.inputs.attachments.map(f => readInputFile(previous,f)))
+      .then(files => {if(restoreVersion.current === version)setAttachments(files);})
+      .catch(e => {if(restoreVersion.current === version)setError(String(e));})
+      .finally(() => {if(restoreVersion.current === version)setRestoring(false);});
+    return () => {restoreVersion.current++;};
+  }, [creating, loading, scope, node, rerun, editingDraft]);
   const formSteps =
     rerun && !useLatest
       ? Object.values(rerun.state.nodes).map((n) => n.step)
@@ -286,10 +303,18 @@ export default function AgentRunsPanel({
       : members;
   const duplicateEmployees =
     new Set(formSteps.map((s) => s.owner)).size !== formSteps.length;
+  const openedRun = useRef<string | undefined>(undefined);
+  useEffect(()=>{
+    const match = runs.find(r=>r.id===initialRun);
+    if(match&&openedRun.current!==initialRun){openedRun.current=initialRun;setSelected(taskId(match));setSelectedRun(match.id);}
+  },[runs,initialRun]);
   const history = runs.filter((r) => taskId(r) === selected);
   const run = history.find((r) => r.id === selectedRun) ?? history[0];
   const chosenNode = run && nodeKey ? run.state.nodes[nodeKey] : undefined;
   const active = run && ["running", "queued"].includes(run.status);
+  function openEmployeeChat(key: string) {
+    if (run) onEmployeeChat?.({projectId,runId:run.id,nodeKey:key,name:run.state.nodes[key].employee.name,problem:run.state.nodes[key].question || run.state.nodes[key].error});
+  }
   async function action(path: string, body?: unknown, method = "POST") {
     setBusy(true);
     setError("");
@@ -309,12 +334,12 @@ export default function AgentRunsPanel({
   }
   async function submit(draft = false) {
     const data = {
-      title: title.trim() || description.trim().slice(0, 60),
+      title: (editingDraft || rerun)?.title || description.trim().slice(0, 60),
       description,
       scope,
       node: scope === "node" ? node : null,
-      input_text: inputText,
-      acceptance,
+      input_text: (editingDraft || rerun)?.inputs?.input_text ?? "",
+      acceptance: (editingDraft || rerun)?.inputs?.acceptance ?? "",
       attachments,
       save_draft: draft,
       ...(rerun
@@ -365,10 +390,7 @@ export default function AgentRunsPanel({
       setRerun(edit ? undefined : run);
       setScope(run.scope);
       setNode(run.inputs?.node);
-      setTitle(run.title);
       setDescription(run.inputs?.description ?? "");
-      setInputText(run.inputs?.input_text ?? "");
-      setAcceptance(run.inputs?.acceptance ?? "");
       setAttachments(files);
       setUseLatest(false);
       setCreating(true);
@@ -564,7 +586,7 @@ export default function AgentRunsPanel({
                         (n) => n.question && !n.answer,
                       )?.question ??
                       Object.values(r.run.state.nodes).find(
-                        (n) => n.status === "running",
+                        (n) => ["preparing", "running"].includes(n.status),
                       )?.activity ??
                       labels[r.status])
                     : "查看历史成果",
@@ -624,7 +646,7 @@ export default function AgentRunsPanel({
                   停止执行
                 </Button>
               )}
-              {["interrupted", "cancelled", "waiting_human"].includes(
+              {["interrupted", "cancelled", "waiting_human", "failed"].includes(
                 run.status,
               ) && (
                 <Button
@@ -660,16 +682,14 @@ export default function AgentRunsPanel({
             <Alert type="warning" message={run.state.error} />
           )}
           <ExecutionWorkflow
-            actions={
-              !active && run.status !== "draft" ? (
-                <Button disabled={busy} onClick={() => void again()}>
-                  再次执行
-                </Button>
-              ) : undefined
-            }
+            actions={<Space>
+              {!active && run.status !== "draft" && <Button disabled={busy} onClick={() => void again()}>再次执行</Button>}
+            </Space>}
             nodes={run.state.nodes}
             status={run.status}
             busy={busy}
+            onLogs={setActivityNode}
+            onTune={onEmployeeChat ? openEmployeeChat : undefined}
             onOpen={setNodeKey}
             onData={setDataView}
             onRestart={(key) => {
@@ -690,6 +710,7 @@ export default function AgentRunsPanel({
                     setAnswers({ ...answers, [key]: e.target.value })
                   }
                 />
+                <Space size={12} wrap>
                 <Button
                   disabled={
                     busy ||
@@ -707,6 +728,8 @@ export default function AgentRunsPanel({
                 >
                   提交答复
                 </Button>
+                {onEmployeeChat && n.employee.kind !== "human" && <Button onClick={() => openEmployeeChat(key)}>与员工对话</Button>}
+                </Space>
                 <small>所有问题答复后，可恢复执行。</small>
               </div>
             ))}
@@ -740,7 +763,7 @@ export default function AgentRunsPanel({
             </Button>
             {!rerun && (
               <Button
-                disabled={busy || !(title.trim() || description.trim())}
+                disabled={busy || restoring || !description.trim()}
                 onClick={() => void submit(true)}
               >
                 保存草稿
@@ -750,6 +773,7 @@ export default function AgentRunsPanel({
               type="primary"
               loading={busy}
               disabled={
+                busy || restoring ||
                 !description.trim() ||
                 !formSteps.length ||
                 (scope === "workflow" && duplicateEmployees) ||
@@ -771,21 +795,11 @@ export default function AgentRunsPanel({
         )}
         <div className="task-create-form">
           <label>
-            任务名称
-            <Input
-              aria-label="任务名称"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="例如：8 月销售分析"
-              maxLength={200}
-            />
-          </label>
-          <label>
             执行范围
             <Select
               aria-label="运行范围"
               value={scope}
-              disabled={!!rerun}
+              disabled={!!rerun || restoring}
               onChange={setScope}
               options={[
                 { value: "workflow", label: "团队执行" },
@@ -798,6 +812,7 @@ export default function AgentRunsPanel({
               执行员工
               <Select
                 aria-label="选择员工"
+                disabled={restoring}
                 value={node}
                 onChange={setNode}
                 options={formSteps
@@ -826,6 +841,7 @@ export default function AgentRunsPanel({
             工作要求
             <Input.TextArea
               aria-label="任务输入"
+              disabled={restoring}
               rows={4}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -833,18 +849,8 @@ export default function AgentRunsPanel({
               maxLength={20000}
             />
           </label>
-          <label>
-            输入资料
-            <Input.TextArea
-              aria-label="输入资料"
-              rows={4}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="补充原始数据、资料说明或上游结果"
-              maxLength={20000}
-            />
-          </label>
           <Upload
+            disabled={restoring}
             multiple
             showUploadList={false}
             beforeUpload={async (file) => {
@@ -866,7 +872,7 @@ export default function AgentRunsPanel({
           </Upload>
           {attachments.map((f) => (
             <Tag
-              closable
+              closable={!restoring}
               onClose={() =>
                 setAttachments((old) => old.filter((a) => a.name !== f.name))
               }
@@ -876,27 +882,19 @@ export default function AgentRunsPanel({
             </Tag>
           ))}
           <Select<string>
-            aria-label="引用团队资料"
-            placeholder="选择团队资料作为输入"
-            value={undefined}
-            options={sources.map((s) => ({ value: s.id, label: s.title }))}
-            onChange={async (id) => {
-              const source = sources.find((s) => s.id === id);
-              if (!source) return;
-              const name = `资料-${source.id.slice(-8)}.txt`;
+            aria-label="已上传的文件"
+            placeholder="选择已上传的文件"
+            showSearch optionFilterProp="label" value={undefined} disabled={restoring}
+            options={runs.flatMap(r => (r.inputs?.attachments ?? []).map(f => ({value:JSON.stringify({run:r.id,path:f.path}),label:`${f.name} · ${r.title}`})))}
+            onChange={async value => {
+              const selected = JSON.parse(value);
+              const source = runs.find(r => r.id === selected.run);
+              const file = source?.inputs?.attachments?.find(f => f.path === selected.path);
+              if (!source || !file) return;
               try {
-                const data = await encodeFile(
-                  new Blob([
-                    `${source.title}\n资料覆盖范围：${source.coverage}\n\n${source.content}`,
-                  ]),
-                );
-                setAttachments((old) => [
-                  ...old.filter((f) => f.name !== name),
-                  { name, data },
-                ]);
-              } catch (e) {
-                setError(String(e));
-              }
+                const attachment = await readInputFile(source,file);
+                setAttachments(old => [...old.filter(f => f.name !== attachment.name), attachment]);
+              } catch(e) {setError(String(e));}
             }}
           />
           <Select<string>
@@ -929,16 +927,6 @@ export default function AgentRunsPanel({
               }
             }}
           />
-          <label>
-            验收要求
-            <Input.TextArea
-              aria-label="验收要求"
-              value={acceptance}
-              onChange={(e) => setAcceptance(e.target.value)}
-              placeholder="什么结果才算完成"
-              maxLength={10000}
-            />
-          </label>
           {rerun && (
             <Checkbox
               checked={useLatest}
@@ -947,26 +935,7 @@ export default function AgentRunsPanel({
               使用团队最新配置（默认沿用原执行配置）
             </Checkbox>
           )}
-          <div className="task-brief">
-            <strong>参与员工</strong>
-            <p>
-              {formSteps
-                .filter(
-                  (s) =>
-                    scope === "workflow" || s.key === node || s.owner === node,
-                )
-                .filter(
-                  (s, i, all) =>
-                    all.findIndex((other) => other.owner === s.owner) === i,
-                )
-                .map(
-                  (s) =>
-                    formMembers.find((m) => m.key === s.owner)?.name ?? s.name,
-                )
-                .join("、") || "请先配置团队员工节点"}
-            </p>
-            <small>每名员工一个节点；本次配置和输入将在执行时固定。</small>
-          </div>
+
         </div>
       </Drawer>
       <Drawer
@@ -1098,6 +1067,10 @@ export default function AgentRunsPanel({
         <pre className="task-file-preview">
           {preview?.text ?? preview?.reason}
         </pre>
+      </Drawer>
+      <Drawer title="Agent 日志" open={activityNode !== undefined && !!run}
+        onClose={() => setActivityNode(undefined)} width="min(100vw, max(50vw, 520px))" destroyOnHidden>
+        {activityNode !== undefined && run && <AgentActivity key={`${run.id}-${activityNode}`} projectId={projectId} runId={run.id} nodes={run.state.nodes} initialNode={activityNode} />}
       </Drawer>
       <Drawer
         title="执行文件"

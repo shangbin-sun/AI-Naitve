@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "AI Project Factory — conversational team design and employee development"
 requires-python = ">=3.11"
 dependencies = [
+  "PyYAML>=6,<7",
   "jsonschema>=4.23,<5",
   "mcp>=1.20,<2",
   "Pillow>=11,<13",

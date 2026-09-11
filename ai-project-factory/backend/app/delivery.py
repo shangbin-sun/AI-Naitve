@@ -1,6 +1,7 @@
 """Execute repository reference tests and ask platform Codex to repair their failures."""
 from typing import Literal
 import copy
+from .employee_context import employee_context_from_db
 import asyncio
 import hashlib
 import json
@@ -116,7 +117,10 @@ async def delivery(manager, identity, inputs):
             prepare_outputs(manager.settings.data_dir/'output-workspaces', db.get(Evaluation,identity))
     async def log(text):result['events'].append(text);save()
     async def invoke(role, attempt, payload, schema, instructions):
-        record={'employee_key':role,'attempt':attempt,'input':copy.deepcopy(payload),'instructions':instructions,'events':[],'status':'running','started_at':now(),'model':manager.settings.codex_model,'reasoning_effort':manager.settings.codex_reasoning_effort,'output_schema':schema.model_json_schema()}
+        capability = next((e.get('instruction_bundle') for e in inputs.get('employees', []) if e['key'] == role), None)
+        if capability:
+            instructions += '\n' + capability['content']
+        record={'loaded_capability':capability,'employee_key':role,'attempt':attempt,'input':copy.deepcopy(payload),'instructions':instructions,'events':[],'status':'running','started_at':now(),'model':manager.settings.codex_model,'reasoning_effort':manager.settings.codex_reasoning_effort,'output_schema':schema.model_json_schema()}
         result.setdefault('employee_records',[]).append(record);save()
         async def employee_log(text):
             record['events'].append(text)
@@ -269,7 +273,7 @@ def install_delivery(app,manager):
             if data.restart_node=='test' and any('analysis' in c.get('step_id','') for c in (editor_inputs or {}).get('changes',[])):raise HTTPException(422,'需求方案已修改，请从开发继续')
             if data.restart_node=='develop' and not previous_plan:raise HTTPException(422,'请先运行需求与架构，生成方案后再开发')
             row=Evaluation(design_id=identity,design_version=design.version,kind='delivery',inputs={**data.model_dump(),'editor_snapshot':editor_inputs,'resume_workspace':resume_workspace,'previous_plan':previous_plan,
-                'task_snapshot':task_record(task) if task else None,'team_snapshot':[{'id':e.id,'key':e.key,'version':e.version,'profile':copy.deepcopy(e.profile)} for e in db.scalars(select(Employee).where(Employee.design_id==identity,Employee.active.is_(True)))],'workflow_snapshot':copy.deepcopy(design.draft),'project':{'version':design.version,'workflow_nodes':len(design.draft.get('workflow',[]))},'code_source_id':source['id'],'sources':sources,'employees':[{'key':e.key,'version':e.version,'profile':e.profile,'runtime_manifest':e.files.get('runtime.json',''),'instructions':e.files.get('AGENTS.md',e.profile.get('instructions',''))} for e in db.scalars(select(Employee).where(Employee.design_id==identity,Employee.active.is_(True))) if e.key.startswith('it_')]})
+                'task_snapshot':task_record(task) if task else None,'team_snapshot':[{'id':e.id,'key':e.key,'version':e.version,'profile':copy.deepcopy(e.profile)} for e in db.scalars(select(Employee).where(Employee.design_id==identity,Employee.active.is_(True)))],'workflow_snapshot':copy.deepcopy(design.draft),'project':{'version':design.version,'workflow_nodes':len(design.draft.get('workflow',[]))},'code_source_id':source['id'],'sources':sources,'employees':[{'key':e.key,'version':e.version,'profile':e.profile,'instruction_bundle':employee_context_from_db(db,e),'runtime_manifest':e.files.get('runtime.json',''),'instructions':e.files.get('AGENTS.md',e.profile.get('instructions',''))} for e in db.scalars(select(Employee).where(Employee.design_id==identity,Employee.active.is_(True))) if e.key.startswith('it_')]})
             db.add(Message(design_id=identity,role='user',content=data.goal))
             db.add(Message(design_id=identity,role='assistant',content='已启动原有样例驱动的AI 团队开发流程。平台将保存每轮需求/架构分析、代码修复和参考测试结果；请在资料与评估查看进度。'))
             db.add(row);db.flush()

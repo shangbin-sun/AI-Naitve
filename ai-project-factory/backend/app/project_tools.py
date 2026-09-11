@@ -149,10 +149,12 @@ class ProjectTools:
                               'changed': True, 'tested': False}
                 elif action == 'apply_team_changes':
                     proposed = Draft.model_validate(args['draft']).model_dump()
-                    # Team creation must not silently remove existing employees or workflow nodes.
-                    for field in ('members', 'workflow'):
-                        if not {v['key'] for v in design.draft.get(field, [])} <= {v['key'] for v in proposed[field]}:
-                            raise HTTPException(422, '团队工具不能删除已有成员或节点；请在方案编辑页明确处理')
+                    # Explicit removal lists prevent accidental omission in a full draft update.
+                    for field, argument in (('members', 'removed_members'), ('workflow', 'removed_nodes')):
+                        removed = {v['key'] for v in design.draft.get(field, [])} - {v['key'] for v in proposed[field]}
+                        declared = args.get(argument, [])
+                        if not isinstance(declared, list) or any(not isinstance(key, str) for key in declared) or removed != set(declared):
+                            raise HTTPException(422, '删除成员或节点时必须明确列出对应 key，并同步修复依赖与人工分工')
                     apply_draft(db, project, args['expected_version'], proposed, 'codex_tools')
                     result = {'project_version': design.version, 'saved': True, 'scope': '团队与员工工程草稿；不代表员工已构建或测试'}
                 else:

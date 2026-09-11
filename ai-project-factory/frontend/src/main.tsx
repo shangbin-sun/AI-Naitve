@@ -5,6 +5,7 @@ import { ConfigProvider, App as AntApp } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import App from "./App";
 import "./styles.css";
+import "./theme.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -12,19 +13,23 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       locale={zhCN}
       theme={{
         token: {
-          colorPrimary: "#4869d8",
+          colorPrimary: "#6265f5",
+          colorInfo: "#6265f5",
+          colorSuccess: "#20b68a",
+          colorWarning: "#d99a32",
+          colorError: "#e36380",
           borderRadius: 8,
-          colorBorder: "#dce3ee",
+          colorBorder: "#e2e7f3",
           controlHeight: 34,
           fontFamily:
             'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
-          colorText: "#344054",
-          colorTextHeading: "#182230",
-          colorTextSecondary: "#536176",
-          colorTextDescription: "#65738a",
-          colorTextPlaceholder: "#65738a",
+          colorText: "#28334a",
+          colorTextHeading: "#202b42",
+          colorTextSecondary: "#4c5972",
+          colorTextDescription: "#63718b",
+          colorTextPlaceholder: "#63718b",
           colorTextDisabled: "#8a94a6",
-          colorBgLayout: "#f5f7fb",
+          colorBgLayout: "#f8faff",
         },
       }}
     >

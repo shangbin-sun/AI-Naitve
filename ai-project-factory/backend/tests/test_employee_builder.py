@@ -105,3 +105,15 @@ def test_platform_repairs_real_failure_and_gates_installation(tmp_path, heldout_
             assert json.loads(trial['result']['output'])=={'value':14}
             assert trial['inputs']['employee_version']==1
             assert client.post(f"/api/employees/{row['result']['employee_id']}/runs",json={'input_json':'invalid'}).status_code==422
+
+
+@pytest.mark.skipif(sys.platform!='darwin',reason='macOS worker sandbox')
+def test_worker_can_write_team_project_but_not_other_directory(tmp_path):
+    team=tmp_path/'team';team.mkdir()
+    work=tmp_path/'work';work.mkdir()
+    outside=tmp_path/'other';outside.mkdir()
+    (team/'resource.txt').write_text('team resource')
+    (work/'employee.py').write_text('import pathlib,json\nr={}\np=pathlib.Path('+repr(str(team))+')\nr["read"]= (p/"resource.txt").read_text()\n(p/"new.txt").write_text("saved")\nr["write"]=True\ntry:\n pathlib.Path('+repr(str(outside/'blocked.txt'))+').write_text("bad");r["outside"]=True\nexcept PermissionError:r["outside"]=False\nprint(json.dumps(r))')
+    result=asyncio.run(execute(work,['employee.py'],read_root=team))
+    assert result['exit_code']==0,result
+    assert json.loads(result['stdout'])=={'read':'team resource','write':True,'outside':False}

@@ -18,14 +18,22 @@ class EditRuleFile(BaseModel):
 
 
 def install_workspace_browser(app, workspaces, runs):
-    def context(project, run_id, refresh=False):
+    def context(project, run_id, refresh=False, node=None):
         with runs.sessions() as db:
             get_design(db, project)
             if run_id:
                 task, run = runs.rows(db, project, run_id)
                 root = runs.directory(task, run)
+                if node is not None:
+                    employee = run.state.get('nodes', {}).get(node)
+                    if not employee or not employee.get('attempt'):
+                        raise HTTPException(404, '员工工作目录尚未建立')
+                    relative = employee.get('tuning', {}).get('attempt') or 'nodes/' + node + '/attempts/' + employee['attempt']
+                    return safe_path(root, relative), {'scope': 'node', 'label': employee['employee']['name'] + '工作空间', 'run_id': run.id}
                 return root, {'scope': task.scope, 'label': '单节点工作空间' if task.scope == 'node' else '任务工作空间',
                               'thread_id': run.thread_id, 'run_id': run.id}
+        if node is not None:
+            raise HTTPException(422, '员工文件需要指定执行批次')
         if refresh or not workspaces.project(project).exists():
             workspaces.snapshot(project)
         return workspaces.project(project), {'scope':'project', 'label':'AI 团队工作空间', 'run_id':None}
@@ -37,8 +45,8 @@ def install_workspace_browser(app, workspaces, runs):
             raise HTTPException(403, '只能访问当前工作空间内的文件') from error
 
     @app.get('/api/workspaces/{project}/files')
-    def listing(project: str, run_id: str | None = None, path: str = ''):
-        root, details = context(project, run_id, refresh=not path)
+    def listing(project: str, run_id: str | None = None, path: str = '', node: str | None = None):
+        root, details = context(project, run_id, refresh=not path, node=node)
         directory = resolve(root, path)
         if not directory.is_dir():
             raise HTTPException(404, '目录不存在')
@@ -83,8 +91,8 @@ def install_workspace_browser(app, workspaces, runs):
         return {'name':Path(data.path).name, 'path':data.path, 'text':data.text, 'editable':True, 'version':version}
 
     @app.get('/api/workspaces/{project}/file')
-    def file(project: str, path: str, run_id: str | None = None, download: bool = False):
-        root, _ = context(project, run_id)
+    def file(project: str, path: str, run_id: str | None = None, download: bool = False, node: str | None = None):
+        root, _ = context(project, run_id, node=node)
         target = resolve(root, path)
         if not target.is_file():
             raise HTTPException(404, '文件不存在')

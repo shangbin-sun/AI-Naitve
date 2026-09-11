@@ -1,6 +1,6 @@
 .tasks-panel {
   padding: 28px 32px;
-  color: #263449;
+  color: var(--text-body);
 }
 .tasks-header {
   display: flex;
@@ -14,7 +14,7 @@
   margin: 0 0 10px;
 }
 .tasks-header p {
-  color: #586980;
+  color: var(--text-secondary);
   line-height: 1.7;
   max-width: 850px;
   white-space: pre-wrap;
@@ -48,7 +48,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   padding: 16px;
-  background: #f4f6fa;
+  background: var(--surface-subtle);
   max-height: 480px;
   overflow: auto;
 }
@@ -79,12 +79,12 @@
   }
 }
 
-.run-flow {margin:24px 0;padding:22px;background:#f7f9fd;border:1px solid #dce3ee;border-radius:16px}
-.run-flow h3 {margin:0 0 6px;color:#18253b}.run-flow p {color:#516079;margin:8px 0 18px}
+.run-flow {margin:24px 0;padding:22px;background:var(--primary-soft);border:1px solid #dce3ee;border-radius:16px}
+.run-flow h3 {margin:0 0 6px;color:#18253b}.run-flow p {color:var(--text-secondary);margin:8px 0 18px}
 .run-flow-nodes {display:flex;gap:24px;overflow-x:auto;padding:18px 3px 12px}
 .run-flow-node {position:relative;flex:1;min-width:180px;background:white;border:1px solid #d6deea;border-radius:12px;padding:18px;min-height:190px}
 .run-flow-node:not(:last-child)::after {content:'→';position:absolute;right:-21px;top:48%;color:#7586a3}
 .run-flow-node h4 {font-size:16px;margin:12px 0 6px;color:#1c2c45}.run-flow-node p {font-size:12px;min-height:30px;margin-bottom:12px;overflow-wrap:anywhere}
-.run-flow-node .ant-btn {display:block;margin-top:18px}.run-flow-index {color:#5268bd;font-weight:700;font-size:12px}
-.run-flow-node.state-running {border:2px solid #526cf5;box-shadow:0 3px 16px #526cf51a}.run-flow-node.state-failed {border-color:#e38d89}.run-flow-node.state-completed {border-top:3px solid #35a780}
+.run-flow-node .ant-btn {display:block;margin-top:18px}.run-flow-index {color:var(--text-action);font-weight:700;font-size:12px}
+.run-flow-node.state-running {border:2px solid var(--primary);box-shadow:0 3px 16px #526cf51a}.run-flow-node.state-failed {border-color:#e38d89}.run-flow-node.state-completed {border-top:3px solid #35a780}
 .run-flow .run-flow-note {font-size:12px;margin-bottom:0;line-height:1.8}

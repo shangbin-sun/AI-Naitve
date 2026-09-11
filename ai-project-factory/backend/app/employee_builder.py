@@ -1,4 +1,6 @@
 """Platform-driven Codex employee construction and deterministic sample verification."""
+from .runtime_environment import runtime_environment
+from .employee_context import employee_context_from_db
 import asyncio
 import copy
 import hashlib
@@ -63,12 +65,14 @@ async def run_employee(manager, identity, inputs):
         path=workspace/name
         path.parent.mkdir(parents=True,exist_ok=True)
         path.write_text(content)
-    run=await execute(workspace,['employee.py'],inputs['input_json'])
+    if inputs.get('instruction_bundle'):
+        (workspace/'loaded-capability.json').write_text(json.dumps(inputs['instruction_bundle'], ensure_ascii=False, indent=2))
+    run=await execute(workspace,['employee.py'],inputs['input_json'],read_root=inputs.get('team_read_root'))
     actual=json.loads(run['stdout']) if run['exit_code']==0 else None
     expected = inputs.get('expected_json')
     comparison = {'expected': json.loads(expected), 'actual': actual, 'passed': run['exit_code'] == 0 and actual == json.loads(expected)} if expected is not None else None
     return {**run,'comparison': comparison, 'output':json.dumps(actual,ensure_ascii=False,indent=2) if actual is not None else run['stderr'],
-        'workspace':str(workspace),'employee_version':inputs['employee_version'],
+        'loaded_capability':inputs.get('instruction_bundle'),'workspace':str(workspace),'employee_version':inputs['employee_version'],
         'files_hash':digest(inputs['files']),'scope': '员工实际试运行；对照所提供预期JSON，非完整业务验收' if comparison else '员工实际试运行；本次输入没有预期答案，不代表业务验收通过'}, 'completed' if run['exit_code']==0 and (comparison is None or comparison['passed']) else 'blocked'
 
 
@@ -99,21 +103,25 @@ def validate_blueprint(plan, source_ids):
         json.loads(case['input_json']); json.loads(case['expected_json'])
 
 
-def sandbox_command(workspace, args):
+def sandbox_command(workspace, args, read_root=None):
     if sys.platform != 'darwin' or not Path('/usr/bin/sandbox-exec').exists():
         raise RuntimeError('当前员工执行器需要macOS sandbox-exec；其他平台需接入容器Worker，不会降级为无隔离执行')
-    # Read Python runtime and own workspace, but not the host user's project DB or credentials.
+    # Allow the selected team project plus the worker workspace; keep other teams outside.
     allowed = [workspace.resolve(), Path(sys.base_prefix).resolve(), Path(sys.prefix).resolve()]
+    if read_root is not None:
+        allowed.append(Path(read_root).resolve())
     exclusions = ' '.join(f'(require-not (subpath {json.dumps(str(p))}))' for p in allowed)
+    writable = [workspace.resolve()] + ([Path(read_root).resolve()] if read_root is not None else [])
+    write_exclusions = ' '.join(f'(require-not (subpath {json.dumps(str(p))}))' for p in writable)
     policy = f'''(version 1)(allow default)(deny network*)
 (deny file-read-data (require-all (subpath {json.dumps(str(Path.home()))}) {exclusions}))
-(deny file-write* (require-all (require-not (subpath {json.dumps(str(workspace.resolve()))})) (require-not (literal "/dev/null"))))'''
+(deny file-write* (require-all {write_exclusions} (require-not (literal "/dev/null"))))'''
     return ['/usr/bin/sandbox-exec','-p',policy,sys.executable,*args]
 
 
-async def execute(workspace, args, input_text='', timeout=20):
-    env = {'PATH':'/usr/bin:/bin','HOME':str(workspace),'TMPDIR':str(workspace), 'LANG':'en_US.UTF-8', 'PYTHONDONTWRITEBYTECODE':'1'}
-    proc = await asyncio.create_subprocess_exec(*sandbox_command(workspace,args),cwd=workspace,env=env,
+async def execute(workspace, args, input_text='', timeout=20, read_root=None):
+    env = {'PATH':'/usr/bin:/bin','HOME':str(workspace),**runtime_environment(workspace), 'LANG':'en_US.UTF-8', 'PYTHONDONTWRITEBYTECODE':'1'}
+    proc = await asyncio.create_subprocess_exec(*sandbox_command(workspace,args,read_root),cwd=workspace,env=env,
         stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,start_new_session=True)
     async def bounded_read(stream):
         data=bytearray()
@@ -222,7 +230,7 @@ def install_builder(app, manager):
             if db.scalar(select(Evaluation.id).where(Evaluation.design_id==design.id,Evaluation.status.in_(['queued','running']))):
                 raise HTTPException(409,'当前AI 团队已有运行进行中')
             row=Evaluation(design_id=design.id,design_version=design.version,kind='employee_run',inputs={
-                'employee_id':identity,'employee_version':employee.version,'files':copy.deepcopy(employee.files),
+                'team_read_root':str(manager.settings.data_dir.resolve()/'projects'/design.id),'instruction_bundle':employee_context_from_db(db,employee),'employee_id':identity,'employee_version':employee.version,'files':copy.deepcopy(employee.files),
                 'input_json':data.input_json})
             db.add(row);db.flush();result={c.name:getattr(row,c.name) for c in row.__table__.columns}
         manager.start(result['id']);return result

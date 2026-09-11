@@ -2203,3 +2203,13 @@ div.member-row:hover {
   padding: 24px;
 }
 .project-library-empty > .ant-empty { margin: 0; }
+
+.sidebar-employee-chats {margin:2px 8px 10px 24px; padding-left:8px; min-width:0;}
+.sidebar-employee-chat {display:flex; align-items:center; min-width:0; border-radius:6px; margin:2px 0; color:#aebacf; height:30px;}
+.sidebar-employee-chat.selected {background:#202f45;color:#e5ebf6;}
+.sidebar-employee-chat:hover {background:#1b293d;color:#fff;}
+.sidebar-employee-chat button {border:0;background:transparent;color:inherit;cursor:pointer;}
+.sidebar-employee-chat button:first-child {display:flex;gap:6px;align-items:center;flex:1;min-width:0;text-align:left;padding:5px 6px;font-size:12px;line-height:20px;}
+.sidebar-employee-chat span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sidebar-employee-chat button:last-child {flex:0 0 24px;width:24px;height:24px;padding:0;font-size:15px;opacity:0;}
+.sidebar-employee-chat:hover button:last-child,.sidebar-employee-chat:focus-within button:last-child {opacity:1;}

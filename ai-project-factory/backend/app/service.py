@@ -41,6 +41,8 @@ def validate_files(files):
 def apply_draft(db, identity, expected, draft, source):
     draft = Draft.model_validate(draft).model_dump()
     row = get_design(db, identity)
+    if source in ("codex_tools", "codex"):
+        draft["name"] = row.title
     changed = db.execute(update(Design).where(Design.id == identity, Design.version == expected).values(
         draft=draft, title=draft["name"], version=expected + 1, updated_at=now(),
     ))

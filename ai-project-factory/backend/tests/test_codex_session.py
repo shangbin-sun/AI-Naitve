@@ -110,7 +110,8 @@ def test_exact_incremental_input_restart_and_separate_plan(tmp_path):
         assert second['jobs'][0]['usage']['input_tokens'] == 10
         client.post(f'/api/workspaces/{identity}/plan', json={'content': '生成方案', 'request_id': 'plan', 'expected_version': 0})
         plan = wait(client, identity)
-        assert plan['draft'] == DRAFT and plan['version'] == 1
+        assert plan['draft'] == {**DRAFT, 'name': 'AI 团队'} and plan['version'] == 1
+        assert plan['title'] == 'AI 团队'
         assert plan['codex_conversation']['thread_id'] == thread
         last = [params for method, params in connection.calls if method == 'turn/start'][-1]
         assert last['threadId'] != thread and 'outputSchema' in last
@@ -121,7 +122,7 @@ def test_exact_incremental_input_restart_and_separate_plan(tmp_path):
         assert result['codex_conversation']['thread_id'] == thread
         assert any(method == 'thread/resume' for method, _ in restored.calls)
         assert not any(method == 'thread/start' for method, _ in restored.calls)
-        assert result['draft'] == DRAFT
+        assert result['draft'] == {**DRAFT, 'name': 'AI 团队'}
 
 
 def test_legacy_import_once_and_new_images_only(tmp_path):

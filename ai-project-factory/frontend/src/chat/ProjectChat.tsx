@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   useExternalStoreRuntime,
@@ -26,7 +26,15 @@ import WorkspaceBrowser from "../WorkspaceBrowser";
 import type { ChatMessage } from "./types";
 type Props = {
   workspaceId: string;
+  assistantName?: string;
+  readOnly?: boolean;
+  liveReply?: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  contextPanel?: ReactNode;
+  controls?: ReactNode;
   filesOpen?: boolean;
+  fileScope?: {runId:string;node:string};
   employees?: { id: string; profile: { name: string } }[];
   employeeReference?: string;
   onReferenceChange?: (id: string) => void;
@@ -102,7 +110,9 @@ const SavedAttachment = () => <Attachment />;
 const MarkdownText = ({ text }: { text: string }) => (
   <Markdown>{text}</Markdown>
 );
+const AssistantName = createContext("✳ AI 团队助手");
 function Message() {
+  const assistantName = useContext(AssistantName);
   const role = useAuiState((s) => s.message.role);
   const employeeReference = useAuiState(
     (s) => s.message.metadata.custom?.employeeReference,
@@ -113,7 +123,7 @@ function Message() {
   return (
     <MessagePrimitive.Root className={`factory-chat-message ${role}`}>
       <div className="factory-chat-author">
-        <span>{role === "user" ? "你" : "✳ AI 团队助手"}</span>
+        <span>{role === "user" ? "你" : assistantName}</span>
         {role === "assistant" && timing && (
           <ProcessingTime
             startedAt={timing.started_at}
@@ -236,7 +246,7 @@ export default function ProjectChat(props: Props) {
         {
           id: `stream-${props.jobId}`,
           role: "assistant",
-          content: current?.reply ?? "",
+          content: props.liveReply ?? current?.reply ?? "",
           timing: props.jobCreatedAt
             ? {
                 started_at: props.jobCreatedAt,
@@ -253,7 +263,7 @@ export default function ProjectChat(props: Props) {
     isRunning: props.busy,
     adapters: { attachments },
     onNew: async (message) => {
-      if (submitting.current || props.busy)
+      if (submitting.current || props.busy || props.readOnly)
         throw new MessageNotSentError("请等待当前任务完成");
       const ids = (message.attachments ?? []).map((a) => a.id);
       if (ids.length > 4) {
@@ -285,17 +295,18 @@ export default function ProjectChat(props: Props) {
       runtime.thread.composer.setText(props.draftText);
   }, [props.draftText, runtime]);
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
+    <AssistantName.Provider value={props.assistantName ?? "✳ AI 团队助手"}><AssistantRuntimeProvider runtime={runtime}>
       <div className="conversation-workspace">
         <ThreadPrimitive.Root className="factory-chat">
           <ThreadPrimitive.Viewport className="factory-chat-viewport">
+            {props.contextPanel}
             <ThreadPrimitive.Empty>
               <div className="factory-chat-empty">
                 <span aria-hidden="true" className="factory-chat-empty-mark">
                   ✳
                 </span>
-                <h2>从一个想法开始</h2>
-                <p>聊聊你想做什么，我们一起把它变成可以执行的AI 团队。</p>
+                <h2>{props.emptyTitle ?? "从一个想法开始"}</h2>
+                <p>{props.emptyDescription ?? "聊聊你想做什么，我们一起把它变成可以执行的AI 团队。"}</p>
               </div>
             </ThreadPrimitive.Empty>
             <ThreadPrimitive.Messages components={{ Message }} />
@@ -318,6 +329,7 @@ export default function ProjectChat(props: Props) {
             />
           )}
           <div className="factory-chat-compose-area">
+            {props.controls}
             <ComposerPrimitive.Root className="factory-chat-composer">
               <div className="factory-chat-attachments">
                 <ComposerPrimitive.Attachments
@@ -336,7 +348,7 @@ export default function ProjectChat(props: Props) {
                     <button
                       type="button"
                       aria-label="移除员工引用"
-                      disabled={props.busy}
+                      disabled={props.busy || props.readOnly}
                       onClick={() => props.onReferenceChange?.("")}
                     >
                       ×
@@ -350,17 +362,17 @@ export default function ProjectChat(props: Props) {
                 minRows={2}
                 maxRows={7}
                 maxLength={12000}
-                disabled={props.busy}
+                disabled={props.busy || props.readOnly}
                 cancelOnEscape={false}
               />
               <div className="factory-chat-actions">
                 <ComposerPrimitive.AddAttachment
-                  disabled={props.busy}
+                  disabled={props.busy || props.readOnly}
                   className="factory-chat-button"
                   aria-label="添加附件"
                   title="添加图片或文件，最多 4 个；也可直接粘贴图片"
                 >
-                  <PaperClipOutlined aria-hidden="true" /> 附件
+                  <PaperClipOutlined aria-hidden="true" /> 图片 / 文件
                 </ComposerPrimitive.AddAttachment>
                 <span className="factory-chat-image-hint" />
                 {props.busy ? (
@@ -374,6 +386,7 @@ export default function ProjectChat(props: Props) {
                   </ComposerPrimitive.Cancel>
                 ) : (
                   <ComposerPrimitive.Send
+                    disabled={props.readOnly}
                     className="factory-chat-button primary factory-chat-submit"
                     aria-label="发送"
                     title="Enter 发送 · Shift + Enter 换行"
@@ -400,8 +413,10 @@ export default function ProjectChat(props: Props) {
         {props.filesOpen && <WorkspaceBrowser
           key={props.workspaceId}
           projectId={props.workspaceId}
+          runId={props.fileScope?.runId}
+          node={props.fileScope?.node}
         />}
       </div>
-    </AssistantRuntimeProvider>
+    </AssistantRuntimeProvider></AssistantName.Provider>
   );
 }

@@ -74,8 +74,12 @@ def test_team_creation_and_reference_scope(tools_workspace):
     draft['members'].append({**draft['members'][0],'key':'reviewer','name':'复核员工'})
     assert call('apply_team_changes', expected_version=1, draft=draft, request_id='team').status_code==200
     assert len(client.get(f'/api/workspaces/{project}').json()['employees'])==2
-    draft['members']=draft['members'][:1]
+    draft['members']=[m for m in draft['members'] if m['key'] != 'reviewer']
     assert call('apply_team_changes', expected_version=2, draft=draft, request_id='delete').status_code==422
+    assert call('apply_team_changes', expected_version=2, draft=draft, removed_members=['reviewer'], request_id='explicit-delete').status_code == 200
+    saved = client.get(f'/api/workspaces/{project}').json()
+    assert len(saved['employees']) == 1
+    assert all(m['key'] != 'reviewer' for m in saved['draft']['members'])
     other=client.post('/api/workspaces',json={'title':'other'}).json()['id']
     response=client.post(f'/api/workspaces/{other}/messages',json={'content':'修改此员工','employee_id':employee['id'],'expected_version':0,'request_id':'foreign'})
     assert response.status_code==404

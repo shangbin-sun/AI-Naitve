@@ -1,5 +1,6 @@
 # coding: utf-8
 """Versioned project references, independent reviews and isolated baseline tests."""
+from .employee_context import employee_context_from_db
 import asyncio
 import hashlib
 import json
@@ -207,7 +208,7 @@ class EvidenceManager:
                 elif kind == 'employee_run':
                     result, status = await run_employee(self, identity, inputs)
                 elif kind == 'requirements':
-                    response, usage = await self.runtime.structured(inputs, AnalysisResult, ANALYSIS_SYSTEM, lambda _: asyncio.sleep(0))
+                    response, usage = await self.runtime.structured(inputs, AnalysisResult, ANALYSIS_SYSTEM + "\n" + "\n\n".join(e["instruction_bundle"]["content"] for e in inputs["employees"] if e.get("instruction_bundle")), lambda _: asyncio.sleep(0))
                     result = response.model_dump()
                     required_files = {'requirements.md','perception-contract.json','execution-contract.json','model-requirements.md','open-questions.md','traceability.csv'}
                     artifacts = result['artifacts']
@@ -370,7 +371,7 @@ def install_evidence(app, manager):
             if not design.draft.get('members'): raise HTTPException(422, '先生成AI 团队方案与员工')
             code = next((s for s in reversed(sources) if s['kind']=='code' and (manager.root/s['id']).is_dir()), None)
             if kind == 'baseline' and not code: raise HTTPException(422, '先导入可执行源码基线')
-            employees = [record(e) for e in db.scalars(select(Employee).where(Employee.design_id==identity, Employee.active.is_(True)))]
+            employees = [{**record(e), 'instruction_bundle': employee_context_from_db(db, e)} for e in db.scalars(select(Employee).where(Employee.design_id==identity, Employee.active.is_(True)))]
             if kind == 'requirements':
                 employees = [e for e in employees if e['key'] == 'requirements']
                 if not employees: raise HTTPException(422, '当前试运行需要标识为requirements的需求员工；请先在方案中设置岗位')

@@ -6,6 +6,7 @@ type Node = {
   step: { depends_on?: string[] };
   status: string;
   activity?: string;
+  preparing_at?: string;
   started_at?: string;
   finished_at?: string;
   artifacts: unknown[];
@@ -13,6 +14,9 @@ type Node = {
 const labels: Record<string, string> = {
   skipped: "无需处理",
   pending: "未开始",
+  draft: "未开始",
+  queued: "准备中",
+  preparing: "准备中",
   running: "执行中",
   completed: "已完成",
   failed: "失败",
@@ -27,6 +31,8 @@ export default function ExecutionWorkflow({
   onOpen,
   onRestart,
   onData,
+  onLogs,
+  onTune,
   actions,
 }: {
   actions?: ReactNode;
@@ -35,6 +41,8 @@ export default function ExecutionWorkflow({
   busy: boolean;
   onOpen: (key: string) => void;
   onRestart: (key: string) => void;
+  onLogs: (node: string) => void;
+  onTune?: (node: string) => void;
   onData: (view: "inputs" | "outputs") => void;
 }) {
   const entries = Object.entries(nodes),
@@ -70,7 +78,9 @@ export default function ExecutionWorkflow({
   const duration = (n: Node) =>
     n.started_at
       ? `${Math.max(0, Math.round((new Date(n.finished_at ?? new Date()).getTime() - new Date(n.started_at).getTime()) / 1000))} 秒`
-      : "尚未开始";
+      : n.preparing_at
+        ? `准备 ${Math.max(0, Math.round((new Date(n.finished_at ?? new Date()).getTime() - new Date(n.preparing_at).getTime()) / 1000))} 秒`
+        : "尚未开始";
   return (
     <section className="execution-workflow" aria-label="执行工作流">
       <div className="execution-workflow-title">
@@ -85,6 +95,11 @@ export default function ExecutionWorkflow({
         </span>
       </div>
       {actions && <div className="execution-workflow-actions">{actions}</div>}
+      <div className="execution-coordinator" aria-label="主 Agent 节点">
+        <div><strong>主 Agent</strong><Tag color={active ? "processing" : "default"}>{labels[status] ?? status}</Tag></div>
+        <small>任务调度与结果校验</small>
+        <Button type="text" size="small" onClick={() => onLogs("")} aria-label="查看主 Agent 日志">查看日志</Button>
+      </div>
       <div className="execution-workflow-scroll">
         <div className="execution-workflow-stage" style={{ width, height }}>
           <svg
@@ -103,7 +118,7 @@ export default function ExecutionWorkflow({
                 markerHeight="6"
                 orient="auto"
               >
-                <path d="M0 0 L10 5 L0 10z" fill="#a0aec0" />
+                <path d="M0 0 L10 5 L0 10z" fill="var(--flow-edge)" />
               </marker>
             </defs>
             {entries.flatMap(([key, n]) => {
@@ -121,8 +136,8 @@ export default function ExecutionWorkflow({
                     d={`M${x},${y} C${x + 20},${y} ${to.x - 20},${to.y + 52} ${to.x},${to.y + 52}`}
                     stroke={
                       dep && nodes[dep].status === "completed"
-                        ? "#6cbb92"
-                        : "#b8c2d3"
+                        ? "var(--status-success)"
+                        : "var(--flow-edge)"
                     }
                     fill="none"
                     markerEnd="url(#execution-arrow)"
@@ -141,14 +156,14 @@ export default function ExecutionWorkflow({
                   <path
                     key={key}
                     d={`M${p.x + 210},${p.y + 52} L${width - 130},${height / 2}`}
-                    stroke="#b8c2d3"
+                    stroke="var(--flow-edge)"
                     markerEnd="url(#execution-arrow)"
                   />
                 );
               })}
           </svg>
           <button
-            className="execution-boundary"
+            className="execution-boundary input-boundary"
             style={{ left: 10, top: height / 2 - 20 }}
             onClick={() => onData("inputs")}
           >
@@ -157,11 +172,11 @@ export default function ExecutionWorkflow({
           {entries.map(([key, n]) => {
             const p = positions.get(key)!,
               state =
-                n.status === "running" && !active ? "interrupted" : n.status;
+                ["preparing", "running"].includes(n.status) && !active ? "interrupted" : n.status;
             return (
               <div
                 key={key}
-                className={`execution-employee state-${state}`}
+                className={`execution-employee ${n.employee.kind === "human" ? "human-employee" : "ai-employee"} state-${state}`}
                 style={{ left: p.x, top: p.y }}
               >
                 <button
@@ -173,13 +188,15 @@ export default function ExecutionWorkflow({
                     <strong>{n.employee.name}</strong>
                     <Tag
                       color={
-                        state === "running"
+                        ["preparing", "running"].includes(state)
                           ? "processing"
                           : ["completed", "skipped"].includes(state)
                             ? "success"
                             : state === "failed"
                               ? "error"
-                              : "default"
+                              : state === "waiting_human"
+                                ? "warning"
+                                : "default"
                       }
                     >
                       {labels[state] ?? state}
@@ -194,19 +211,23 @@ export default function ExecutionWorkflow({
                     {duration(n)} · {n.artifacts.length} 份产物
                   </small>
                 </button>
+                <div className="execution-node-actions">
+                  {onTune && n.employee.kind !== "human" && <Button type="text" size="small" onClick={() => onTune(key)}>与员工对话</Button>}
+                  <Button type="text" size="small" onClick={() => onLogs(key)} aria-label={`查看${n.employee.name}日志`}>查看日志</Button>
                 <Button
                   type="text"
                   size="small"
                   disabled={busy || active || status === "draft"}
                   onClick={() => onRestart(key)}
                 >
-                  修改并从这里执行
+                  从这里执行
                 </Button>
+                </div>
               </div>
             );
           })}
           <button
-            className="execution-boundary"
+            className="execution-boundary output-boundary"
             style={{ left: width - 120, top: height / 2 - 20 }}
             onClick={() => onData("outputs")}
           >

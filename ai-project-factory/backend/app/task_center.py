@@ -97,7 +97,7 @@ def reset_node(node, reason):
     history=node.setdefault('attempts',[])
     if node.get('attempt'): history.append({**prior,'archived_at':now(),'reason':reason})
     node.update(status='pending',attempt=None,thread_id=None,artifacts=[])
-    for key in ('question','answer','error','started_at','finished_at','activity','verification','summary'): node.pop(key,None)
+    for key in ('question','answer','error','preparing_at','started_at','finished_at','activity','verification','summary','warnings','tuning'): node.pop(key,None)
 
 
 class Review(BaseModel):

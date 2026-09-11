@@ -14,6 +14,7 @@ import {
   Button,
   Empty,
   Input,
+  Modal,
   Spin,
   Tabs,
   Tag,
@@ -32,6 +33,8 @@ import {
   SettingOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
+import type { EmployeeConversation } from "./tasks/EmployeeTuning";
+const EmployeeTuning = lazy(() => import("./tasks/EmployeeTuning"));
 const TasksPanel = lazy(() => import("./tasks/TasksPanel"));
 const ProjectChat = lazy(() => import("./chat/ProjectChat"));
 const DashboardPanel = lazy(() => import('./DashboardPanel'));
@@ -107,7 +110,29 @@ export default function FactoryApp() {
   const [projectTab, setProjectTab] = useState<ProjectTab>(
     () => readRoute().tab,
   );
+  const teamLocations = useRef(new Map<string, ProjectTab>());
+  const [employeeChats,setEmployeeChats] = useState<EmployeeConversation[]>(()=>{
+    try {const value=JSON.parse(localStorage.getItem("employee-conversations")||"[]");return Array.isArray(value)?value.filter(c=>c&&typeof c.projectId==="string"&&typeof c.runId==="string"&&typeof c.nodeKey==="string"&&typeof c.name==="string"):[];}catch{return [];}
+  });
+  const [selectedChat,setSelectedChat]=useState<string|null>(()=>new URLSearchParams(window.location.hash.split("?")[1]).get("tuning"));
+  const chatKey=(c:EmployeeConversation)=>`${c.runId}:${c.nodeKey}`;
+  const currentChat=employeeChats.find(c=>c.projectId===active&&chatKey(c)===selectedChat);
+  useEffect(()=>{try{localStorage.setItem("employee-conversations",JSON.stringify(employeeChats));}catch{/* Navigation still works when browser storage is unavailable. */}},[employeeChats]);
+  function openEmployeeChat(conversation:EmployeeConversation){
+    setEmployeeChats(current=>[...current.filter(c=>chatKey(c)!==chatKey(conversation)),conversation]);
+    setReturnRun(conversation.runId);
+    navigate("design",conversation.projectId,conversation.projectId===active ? projectTab : teamLocations.current.get(conversation.projectId) ?? "tasks",false,null,chatKey(conversation));
+  }
+  function closeEmployeeChat(conversation:EmployeeConversation){
+    setEmployeeChats(current=>current.filter(c=>chatKey(c)!==chatKey(conversation)));
+    if(selectedChat===chatKey(conversation)){setReturnRun(conversation.runId);navigate("design",conversation.projectId,"tasks");}
+  }
+  const [namingTeam, setNamingTeam] = useState(false);
+  const [teamName, setTeamName] = useState("");
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [nameError, setNameError] = useState("");
   const [filesOpen, setFilesOpen] = useState(false);
+  const [returnRun,setReturnRun]=useState<string>();
   const [taskLaunch,setTaskLaunch]=useState<{employee?:string;nonce:number}>();
   const [design, setDesign] = useState<Design | null>(null);
   const [runtime, setRuntime] = useState<Runtime | null>(null);
@@ -200,6 +225,22 @@ export default function FactoryApp() {
     }, 6000);
     return () => clearInterval(timer);
   }, [active, job?.status, refreshDesign, refreshLists]);
+  function requestTeamName() {
+    setTeamName(""); setNameError(""); setNamingTeam(true);
+  }
+  async function createNamedTeam() {
+    if (!teamName.trim() || creatingTeam) return;
+    setCreatingTeam(true);
+    try {
+      const created = await api<Design>("/workspaces", {method:"POST", body:JSON.stringify({title:teamName.trim()})});
+      activeRef.current = created.id;
+      setNamingTeam(false);
+      navigate("design", created.id, "conversation");
+      setDesign(created);
+      await refreshLists();
+    } catch (e) { setNameError((e as Error).message); }
+    finally { setCreatingTeam(false); }
+  }
   async function send(
     value = text,
     attachmentIds: string[] = [],
@@ -212,16 +253,7 @@ export default function FactoryApp() {
     try {
       let version = design?.version ?? 0;
       if (!id) {
-        const created = await api<Design>("/workspaces", {
-          method: "POST",
-          body: JSON.stringify({ title: value.slice(0, 24), goal: value }),
-        });
-        id = created.id;
-        version = created.version;
-        activeRef.current = id;
-        navigate("design", id, "conversation");
-        setDesign(created);
-        await refreshLists();
+        setText(value); requestTeamName(); return false;
       }
       if (
         !requestRef.current ||
@@ -269,7 +301,9 @@ export default function FactoryApp() {
     tab: ProjectTab = "conversation",
     replace = false,
     employeeId: string | null = null,
+    tuningId: string | null = null,
   ) {
+    if (view === "design" && active && !currentChat) teamLocations.current.set(active, projectTab);
     scrollPositions.current.set(routeRef.current, window.scrollY);
     const base =
       nextView === "employees"
@@ -278,13 +312,14 @@ export default function FactoryApp() {
           ? "#/projects"
           : `#/projects/${id || "new"}/${tab}`;
     const hash =
-      base + (employeeId ? `?employee=${encodeURIComponent(employeeId)}` : "");
+      base + (employeeId ? `?employee=${encodeURIComponent(employeeId)}` : tuningId ? `?tuning=${encodeURIComponent(tuningId)}` : "");
     if (hash !== window.location.hash)
       window.history[replace ? "replaceState" : "pushState"](null, "", hash);
     routeRef.current = hash;
     setView(nextView);
     setActive(id);
     setProjectTab(tab);
+    setSelectedChat(tuningId);
     if (tab !== "tasks") setTaskLaunch(undefined);
     setEmployeeRouteId(employeeId);
     if (activeRef.current !== id) {
@@ -328,6 +363,7 @@ export default function FactoryApp() {
       window.history.replaceState(null, "", "#/projects");
     const onBack = () => {
       const target = readRoute();
+      setSelectedChat(new URLSearchParams(window.location.hash.split("?")[1]).get("tuning"));
       const proceed = () => {
         setEditor(null);
         setRaw(null);
@@ -438,7 +474,7 @@ export default function FactoryApp() {
           </div>
         </a>
         <button className="sidebar-create-team" aria-label="新建AI团队" title="新建AI团队" onClick={() => {
-          setText(""); navigate("design", null, "conversation");
+          setText(""); requestTeamName();
         }}><PlusOutlined /><span>新建AI团队</span></button>
         <section className="sidebar-teams" aria-label="AI 团队列表">
           <div className="sidebar-teams-heading">
@@ -447,13 +483,17 @@ export default function FactoryApp() {
           </div>
           <div className="sidebar-team-list">
             {designs.map((team) => (
-              <button key={team.id} title={team.title}
+              <div key={team.id}><button title={team.title}
                 aria-label={`进入 AI 团队 ${team.title}`}
                 aria-current={active === team.id ? "page" : undefined}
-                className={`sidebar-team-item ${active === team.id ? "selected" : ""}`}
-                onClick={() => navigate("design", team.id, "conversation")}>
+                className={`sidebar-team-item ${active === team.id && !currentChat ? "selected" : ""}`}
+                onClick={() => navigate("design", team.id, teamLocations.current.get(team.id) ?? (team.id === active ? projectTab : "conversation"))}>
                 <TeamOutlined /><span>{team.title}</span>
               </button>
+              {employeeChats.some(c=>c.projectId===team.id)&&<div className="sidebar-employee-chats">
+                {employeeChats.filter(c=>c.projectId===team.id).map(c=><div key={chatKey(c)} className={`sidebar-employee-chat ${currentChat===c?"selected":""}`}><button onClick={()=>openEmployeeChat(c)} title={c.name}><RobotOutlined/><span>{c.name}</span></button><button aria-label={`关闭${c.name}对话`} title="关闭对话" onClick={()=>closeEmployeeChat(c)}>×</button></div>)}
+              </div>}
+              </div>
             ))}
           </div>
         </section>
@@ -613,6 +653,8 @@ export default function FactoryApp() {
               </div>
             ) : (
               <>
+                {currentChat && <Suspense fallback={<Spin/>}><EmployeeTuning key={chatKey(currentChat)} {...currentChat} onClose={()=>closeEmployeeChat(currentChat)} onContinue={(runId)=>{setReturnRun(runId ?? currentChat.runId);navigate("design",currentChat.projectId,"tasks");}}/></Suspense>}
+                <div style={{display: currentChat ? "none" : "contents"}}>
                 <div className="project-navigation">
                 <Tabs
                   className="project-tabs"
@@ -643,6 +685,8 @@ export default function FactoryApp() {
                         key={design.id}
                         projectId={design.id}
                         launchEmployee={taskLaunch}
+                        initialRun={returnRun}
+                        onEmployeeChat={openEmployeeChat}
                       />
                     </Suspense>
                   </>
@@ -731,6 +775,7 @@ export default function FactoryApp() {
                     )}
                   </section>
                 </div>
+                </div>
               </>
             )}
           </>
@@ -748,7 +793,7 @@ export default function FactoryApp() {
                 <Button
                   type="primary"
                   onClick={() => {
-                    navigate("design", null, "conversation");
+                    requestTeamName();
                   }}
                 >
                   创建AI 团队并生成员工
@@ -797,7 +842,7 @@ export default function FactoryApp() {
             {!designs.length ? (
               <Empty className="spaced" description="从第一个目标开始">
                 <Button
-                  onClick={() => navigate("design", null, "conversation")}
+                  onClick={() => {setText(""); requestTeamName();}}
                 >
                   创建第一个AI 团队
                 </Button>
@@ -837,6 +882,15 @@ export default function FactoryApp() {
         )}
       </main>
 
+      <Modal title="新建AI团队" open={namingTeam} okText="创建团队" cancelText="取消"
+        confirmLoading={creatingTeam} okButtonProps={{disabled:!teamName.trim()}}
+        onOk={() => void createNamedTeam()} onCancel={() => {if(!creatingTeam)setNamingTeam(false);}}>
+        <label htmlFor="new-team-name">AI团队名称</label>
+        <Input id="new-team-name" autoFocus maxLength={200} value={teamName}
+          placeholder="请输入团队名称" disabled={creatingTeam}
+          onChange={e => setTeamName(e.target.value)} onPressEnter={() => void createNamedTeam()} />
+        {nameError && <Alert type="error" message={nameError} />}
+      </Modal>
       {editor && (
         <EmployeeEditor
           key={editor.id}

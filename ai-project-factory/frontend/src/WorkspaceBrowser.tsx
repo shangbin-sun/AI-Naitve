@@ -16,9 +16,11 @@ type Listing = { root: string; label: string; entries: Entry[] };
 export default function WorkspaceBrowser({
   projectId,
   runId,
+  node,
 }: {
   projectId: string;
   runId?: string;
+  node?: string;
 }) {
   const [messageApi, messageContext] = message.useMessage();
   const [path, setPath] = useState(""),
@@ -38,7 +40,7 @@ export default function WorkspaceBrowser({
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const request = useRef(0);
-  const suffix = runId ? `&run_id=${encodeURIComponent(runId)}` : "";
+  const suffix = runId ? `&run_id=${encodeURIComponent(runId)}${node ? `&node=${encodeURIComponent(node)}` : ""}` : "";
   useEffect(() => {
     let current = true;
     request.current += 1;

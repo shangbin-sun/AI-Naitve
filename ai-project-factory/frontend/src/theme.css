@@ -1,0 +1,162 @@
+/* Shared visual language for navigation, chat, workflows and execution views. */
+:root {
+  --primary: #6265f5;
+  --primary-hover: #5053d8;
+  --primary-soft: #eaeaff;
+  --focus-ring: #6265f524;
+  --text-heading: #202b42;
+  --text-body: #28334a;
+  --text-secondary: #4c5972;
+  --text-muted: #63718b;
+  --text-action: #5053d8;
+  --surface: #ffffff;
+  --surface-page: #f8faff;
+  --surface-subtle: #f5f7ff;
+  --border: #e2e7f3;
+  --role-ai-bg: #eaeaff;
+  --role-ai: #5053d8;
+  --role-human-bg: #fff6e8;
+  --role-human: #93651f;
+  --role-input-bg: #eaf8ff;
+  --role-input: #23759a;
+  --role-output-bg: #e8faf3;
+  --role-output: #128462;
+  --flow-edge: #a5ade1;
+  --flow-human-edge: #d5ad69;
+  --canvas-dot: #dce2f5;
+  --accent-success: #20b68a;
+  --status-success: #128462;
+  --status-warning: #a46c17;
+  --status-error: #d04966;
+  color: var(--text-body);
+  background: var(--surface-page);
+}
+.main { background: var(--surface-page); }
+.sidebar { background: #f1f5fc; border-color: var(--border); color: var(--text-body); }
+.sidebar .brand { color: var(--text-heading); }
+.sidebar .brand-mark { background: var(--primary); border-color: transparent; box-shadow: none; color: white; }
+.sidebar .brand-mark span { color: #e7e8ff; }
+.sidebar .brand small, .sidebar .nav-label, .sidebar .recent-heading,
+.sidebar .sidebar-hint, .sidebar .sidebar-footer, .sidebar .runtime-card small,
+.sidebar .sidebar-teams-heading, .sidebar .sidebar-team-list p { color: var(--text-muted); }
+.sidebar .nav-item, .sidebar .recent, .sidebar .sidebar-team-item,
+.sidebar nav .secondary-nav, .sidebar .sidebar-employee-chat { color: var(--text-secondary); }
+.sidebar .nav-item:hover, .sidebar .recent:hover, .sidebar .sidebar-team-item:hover,
+.sidebar .sidebar-employee-chat:hover { background: #e9eefb; color: var(--text-heading); }
+.sidebar .nav-item.selected, .sidebar .recent.active, .sidebar .sidebar-team-item.selected,
+.sidebar .sidebar-employee-chat.selected { background: #eaeaff; color: var(--primary-hover); font-weight: 600; }
+.sidebar .runtime-card, .sidebar .user-avatar { background: #e8eef9; color: var(--text-secondary); border-color: var(--border); }
+.sidebar .runtime-card > .anticon, .sidebar .recent-heading button { color: var(--text-muted); }
+.sidebar .sidebar-footer { border-color: #e1e7f3; }
+.sidebar .nav-item.selected { border-color: #d8dcfa; box-shadow: inset 3px 0 var(--primary); }
+.sidebar .nav-item small { color: var(--text-secondary); background: white; }
+.sidebar .recent.active > span:first-child { color: var(--primary); }
+.sidebar .sidebar-create-team { background: white; color: var(--primary-hover); border-color: #d8dcfa; }
+.sidebar .sidebar-create-team:hover { background: var(--primary-soft); }
+.sidebar .sidebar-create-team:focus-visible { outline-color: var(--primary); }
+.tiny-dot { background: var(--accent-success); box-shadow: none; }
+.tiny-dot.offline { background: var(--text-muted); }
+.welcome h1 > span, .assistant-icon, .project-icon { color: var(--primary); }
+.eyebrow > span { background: var(--primary); box-shadow: none; }
+.welcome-composer:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.project-tabs .ant-tabs-tab-btn { color: var(--text-secondary); }
+.project-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn,
+.project-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { color: var(--primary-hover); }
+.project-tabs .ant-tabs-ink-bar { background: var(--primary); }
+.member-avatar { background: var(--role-ai-bg); color: var(--role-ai); }
+.human-avatar { background: var(--role-human-bg); color: var(--role-human); }
+.file-list button.active { background: var(--primary-soft); box-shadow: inset 2px 0 var(--primary); }
+.snapshot-row:hover, .member-row:hover:not(:disabled), .employee-card:hover { border-color: var(--primary); }
+.ant-tag-processing { color: var(--primary-hover); background: var(--primary-soft); border-color: #d6d7fc; }
+.ant-tag-success { color: var(--status-success); background: var(--role-output-bg); border-color: #bdebd9; }
+.ant-tag-warning { color: var(--status-warning); background: var(--role-human-bg); border-color: #f0dbb5; }
+.ant-tag-error { color: var(--status-error); background: #fff0f4; border-color: #f3ccd6; }
+
+/* Light technical workspace: crisp geometry, restrained depth, clear type. */
+:root {
+  --text-muted: #59677d;
+  --shadow-panel: 0 8px 28px #243b6010, 0 1px 3px #243b6005;
+  --shadow-hover: 0 12px 30px #243b6018, 0 2px 5px #243b6008;
+}
+.app-shell .sidebar {
+  background: linear-gradient(165deg, #f8faff 0%, #f0f4fa 65%, #f3f8fa 100%);
+  border-right: 1px solid #dfe6f0;
+}
+.sidebar .brand { letter-spacing: -.4px; font-weight: 650; }
+.sidebar .brand small { letter-spacing: 2px; }
+.sidebar .brand-mark {
+  border-radius: 12px;
+  background: linear-gradient(145deg, #5685ff, #6655ed);
+  border: 1px solid #ffffff80;
+  box-shadow: inset 0 1px 0 #ffffff55, 0 5px 14px #6265f530;
+}
+.sidebar .sidebar-create-team {
+  border-radius: 10px;
+  box-shadow: 0 2px 5px #243b6006;
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.sidebar .sidebar-create-team:hover { border-color: var(--primary); box-shadow: var(--shadow-panel); }
+.sidebar .sidebar-team-item { border: 1px solid transparent; transition: background .16s ease, border-color .16s ease; }
+.sidebar .sidebar-team-item.selected {
+  background: #fff;
+  border-color: #d7dfed;
+  box-shadow: inset 3px 0 var(--primary), 0 3px 9px #243b6006;
+}
+.sidebar .runtime-card { background: #ffffffb8; border: 1px solid #dfe6f0; border-radius: 10px; }
+.app-shell .project-tabs {
+  background: #ffffffed;
+  backdrop-filter: blur(16px);
+  border-bottom-color: #e3e8f1;
+  box-shadow: 0 3px 12px #243b6003;
+}
+.project-tabs .ant-tabs-tab-btn { letter-spacing: .2px; }
+.project-tabs .ant-tabs-ink-bar { border-radius: 2px 2px 0 0; }
+.app-shell .employee-card, .app-shell .task-group-card {
+  border-radius: 14px;
+  box-shadow: var(--shadow-panel);
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.app-shell .employee-card:hover, .app-shell .task-group-card:hover { box-shadow: var(--shadow-hover); }
+.app-shell .factory-chat-composer {
+  border: 1px solid #cad5e5;
+  border-radius: 18px;
+  box-shadow: 0 8px 32px #263e6210, inset 0 1px 0 white;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.app-shell .factory-chat-composer:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring), 0 10px 30px #263e6210;
+}
+.app-shell .factory-chat-submit { border-radius: 11px; box-shadow: inset 0 1px 0 #ffffff30; }
+.app-shell .factory-chat-submit:hover:not(:disabled) { background: var(--primary-hover); }
+.app-shell .workspace-browser {
+  background: linear-gradient(180deg, #f8faff, #fbfcfe);
+  border-color: #e3e8f1;
+}
+.app-shell .workspace-path { font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; line-height: 1.7; }
+.app-shell .workflow-canvas {
+  background-color: #f8fafc;
+  background-image: radial-gradient(#b8c6da80 .8px, transparent .8px);
+  background-size: 22px 22px;
+  border: 1px solid #dce4ef;
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 white, 0 8px 28px #243b6006;
+}
+.app-shell .workflow-canvas-legend, .app-shell .workflow-canvas-summary { background: #ffffffdf; }
+.app-shell .workflow-node {
+  border-radius: 12px;
+  border-color: #d8e1ee;
+  box-shadow: 0 5px 14px #243b600b, 0 1px 2px #243b6005;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.app-shell .workflow-node:hover { border-color: var(--primary); box-shadow: var(--shadow-hover); }
+.app-shell .workflow-node.selected { border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring), var(--shadow-panel); }
+.app-shell .workflow-node-title strong { font-weight: 650; letter-spacing: .1px; }
+.app-shell .workflow-avatar { border-radius: 8px; box-shadow: inset 0 0 0 1px #425d830b; }
+.app-shell .execution-workflow { border-color: #dce4ef; background: #f8fafc; }
+.app-shell .execution-employee, .app-shell .execution-coordinator { box-shadow: var(--shadow-panel); }
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .sidebar-team-item, .app-shell .sidebar-create-team,
+  .app-shell .employee-card, .app-shell .task-group-card,
+  .app-shell .factory-chat-composer, .app-shell .workflow-node { transition: none; }
+}

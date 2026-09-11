@@ -26,6 +26,12 @@ class ChatAttachment(Base):
     created_at: Mapped[str] = mapped_column(String, default=now)
 
 
+class TuningAttachmentUse(Base):
+    __tablename__ = "tuning_attachment_uses"
+    attachment_id: Mapped[str] = mapped_column(ForeignKey("chat_attachments.id", ondelete="CASCADE"), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(100))
+
+
 class UploadAttachment(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     data: str = Field(max_length=7_000_000)
@@ -47,7 +53,7 @@ def message_attachments(db, identity):
 def bind_attachments(db, identity, message_id, ids):
     for attachment_id in ids:
         row = db.get(ChatAttachment, attachment_id)
-        if not row or row.design_id != identity or row.message_id is not None:
+        if not row or row.design_id != identity or row.message_id is not None or db.get(TuningAttachmentUse, row.id):
             raise HTTPException(422, "附件不存在、属于其他AI 团队或已用于另一条消息，请重新上传")
         row.message_id = message_id
 
@@ -117,7 +123,7 @@ def install_chat_attachments(app, sessions):
             row = db.get(ChatAttachment, attachment_id)
             if not row or row.design_id != identity:
                 raise HTTPException(404, "附件不存在")
-            if row.message_id:
+            if row.message_id or db.get(TuningAttachmentUse, row.id):
                 raise HTTPException(409, "已发送附件属于对话历史，不能从附件栏删除")
             db.delete(row)
             return {"deleted": True}

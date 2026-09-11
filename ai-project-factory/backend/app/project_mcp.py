@@ -72,9 +72,9 @@ def update_employee(employee_id: str, expected_version: int, expected_project_ve
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False))
-def apply_team_changes(expected_version: int, draft: dict, request_id: str) -> dict:
-    """用户要求生成/更新团队时保存完整方案，自动生成AI员工工程草稿并校验工作流；保留已有成员与节点，不代表可执行代码已构建。先获取 get_team_schema。"""
-    return call('apply_team_changes', expected_version=expected_version, draft=draft, request_id=request_id)
+def apply_team_changes(expected_version: int, draft: dict, request_id: str, removed_members: list[str] | None = None, removed_nodes: list[str] | None = None) -> dict:
+    """用户要求生成/更新团队时保存完整方案，自动生成AI员工工程草稿并校验工作流；仅在用户明确要求删除时，通过 removed_members/removed_nodes 列出删除的 key，并同步修复流程依赖和人工分工；其他成员与节点保持不变。不代表可执行代码已构建。先获取 get_team_schema。"""
+    return call('apply_team_changes', expected_version=expected_version, draft=draft, request_id=request_id, removed_members=removed_members or [], removed_nodes=removed_nodes or [])
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False))
