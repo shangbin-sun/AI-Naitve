@@ -51,13 +51,6 @@ a {
   font-weight: 650;
   padding: 0 10px;
 }
-.brand small {
-  display: block;
-  font-size: 9px;
-  letter-spacing: 1.7px;
-  margin-top: 6px;
-  color: #7c8b80;
-}
 .brand-mark {
   font-size: 31px;
   background: #203d2f;
@@ -961,11 +954,6 @@ a:focus-visible {
   letter-spacing: 0.3px;
   font-size: 16px;
 }
-.brand small {
-  color: #7d8ba3;
-  font-size: 8px;
-  letter-spacing: 2.2px;
-}
 .brand-mark {
   background: linear-gradient(145deg, #6688ff, #3756d5);
   box-shadow: 0 4px 14px #0003;
@@ -1668,20 +1656,11 @@ a:focus-visible {
     padding: 22px 18px;
   }
 }
-.brand small {
-  white-space: nowrap;
-  font-size: 8px;
-  letter-spacing: 1.6px;
-}
 @media (min-width: 651px) and (max-width: 1000px) {
   .brand {
     gap: 10px;
     padding: 0 7px;
     font-size: 14px;
-  }
-  .brand small {
-    font-size: 7px;
-    letter-spacing: 1.1px;
   }
   .brand-mark {
     flex-shrink: 0;

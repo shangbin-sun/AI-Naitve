@@ -1,3 +1,7 @@
+import TaskScheduleFields, {
+  emptySchedule,
+  schedulePayload,
+} from "./TaskScheduleFields";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -105,6 +109,7 @@ type Step = {
 };
 type Attachment = { name: string; data: string };
 const labels: Record<string, string> = {
+  scheduled: "等待定时执行",
   draft: "未开始",
   pending: "未开始",
   queued: "排队中",
@@ -186,6 +191,18 @@ export default function AgentRunsPanel({
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true);
+  const [schedule, setSchedule] = useState({ ...emptySchedule });
+  const [schedules, setSchedules] = useState<
+    {
+      id: string;
+      task_id: string;
+      status: string;
+      next_at: string;
+      iterations: number;
+      spec: { kind: string };
+      state: { reason?: string; judgment?: { reason: string } };
+    }[]
+  >([]);
   const [creating, setCreating] = useState(false),
     [rerun, setRerun] = useState<Run>(),
     [scope, setScope] = useState("workflow"),
@@ -214,6 +231,11 @@ export default function AgentRunsPanel({
     const data = await api<Run[]>(base);
     if (!Array.isArray(data)) throw new Error("状态更新失败，请刷新重试");
     if (mounted.current) setRuns(data);
+    const plans = await api<typeof schedules>(
+      `/workspaces/${projectId}/task-schedules`,
+    );
+    if (mounted.current)
+      setSchedules(Array.isArray(plans) ? plans.filter((p) => !!p.spec) : []);
   }, [base]);
   useEffect(() => {
     mounted.current = true;
@@ -253,6 +275,7 @@ export default function AgentRunsPanel({
     };
   }, [projectId, refresh]);
   function newTask(employee?: string) {
+    setSchedule({ ...emptySchedule });
     setEditingDraft(undefined);
     setRerun(undefined);
     setDescription("");
@@ -273,25 +296,56 @@ export default function AgentRunsPanel({
           launchEmployee.employee,
       );
   }, [steps, launchEmployee]);
-  async function readInputFile(source: Run, file: NonNullable<Inputs["attachments"]>[number]): Promise<Attachment> {
-    const response = await fetch(`/api/workspaces/${projectId}/file?run_id=${source.id}&path=${encodeURIComponent(file.path)}&download=true`);
+  async function readInputFile(
+    source: Run,
+    file: NonNullable<Inputs["attachments"]>[number],
+  ): Promise<Attachment> {
+    const response = await fetch(
+      `/api/workspaces/${projectId}/file?run_id=${source.id}&path=${encodeURIComponent(file.path)}&download=true`,
+    );
     if (!response.ok) throw new Error(`无法读取已上传文件：${file.name}`);
-    return {name:file.name, data:await encodeFile(await response.blob())};
+    return { name: file.name, data: await encodeFile(await response.blob()) };
   }
   useEffect(() => {
     if (!creating || loading || rerun || editingDraft) return;
     const version = ++restoreVersion.current;
-    const owner = steps.find(s => s.key === node || s.owner === node)?.owner ?? node;
-    const previous = runs.find(r => r.scope === scope && (scope === "workflow" || (owner && Object.values(r.state.nodes).some(n => n.step.owner === owner || n.employee.key === owner))));
-    setDescription([previous?.inputs?.description, previous?.inputs?.input_text].filter(Boolean).join("\n\n"));
+    const owner =
+      steps.find((s) => s.key === node || s.owner === node)?.owner ?? node;
+    const previous = runs.find(
+      (r) =>
+        r.scope === scope &&
+        (scope === "workflow" ||
+          (owner &&
+            Object.values(r.state.nodes).some(
+              (n) => n.step.owner === owner || n.employee.key === owner,
+            ))),
+    );
+    setDescription(
+      [previous?.inputs?.description, previous?.inputs?.input_text]
+        .filter(Boolean)
+        .join("\n\n"),
+    );
     setAttachments([]);
-    if (!previous?.inputs?.attachments?.length) {setRestoring(false); return;}
+    if (!previous?.inputs?.attachments?.length) {
+      setRestoring(false);
+      return;
+    }
     setRestoring(true);
-    void Promise.all(previous.inputs.attachments.map(f => readInputFile(previous,f)))
-      .then(files => {if(restoreVersion.current === version)setAttachments(files);})
-      .catch(e => {if(restoreVersion.current === version)setError(String(e));})
-      .finally(() => {if(restoreVersion.current === version)setRestoring(false);});
-    return () => {restoreVersion.current++;};
+    void Promise.all(
+      previous.inputs.attachments.map((f) => readInputFile(previous, f)),
+    )
+      .then((files) => {
+        if (restoreVersion.current === version) setAttachments(files);
+      })
+      .catch((e) => {
+        if (restoreVersion.current === version) setError(String(e));
+      })
+      .finally(() => {
+        if (restoreVersion.current === version) setRestoring(false);
+      });
+    return () => {
+      restoreVersion.current++;
+    };
   }, [creating, loading, scope, node, rerun, editingDraft]);
   const formSteps =
     rerun && !useLatest
@@ -304,16 +358,27 @@ export default function AgentRunsPanel({
   const duplicateEmployees =
     new Set(formSteps.map((s) => s.owner)).size !== formSteps.length;
   const openedRun = useRef<string | undefined>(undefined);
-  useEffect(()=>{
-    const match = runs.find(r=>r.id===initialRun);
-    if(match&&openedRun.current!==initialRun){openedRun.current=initialRun;setSelected(taskId(match));setSelectedRun(match.id);}
-  },[runs,initialRun]);
+  useEffect(() => {
+    const match = runs.find((r) => r.id === initialRun);
+    if (match && openedRun.current !== initialRun) {
+      openedRun.current = initialRun;
+      setSelected(taskId(match));
+      setSelectedRun(match.id);
+    }
+  }, [runs, initialRun]);
   const history = runs.filter((r) => taskId(r) === selected);
   const run = history.find((r) => r.id === selectedRun) ?? history[0];
   const chosenNode = run && nodeKey ? run.state.nodes[nodeKey] : undefined;
   const active = run && ["running", "queued"].includes(run.status);
   function openEmployeeChat(key: string) {
-    if (run) onEmployeeChat?.({projectId,runId:run.id,nodeKey:key,name:run.state.nodes[key].employee.name,problem:run.state.nodes[key].question || run.state.nodes[key].error});
+    if (run)
+      onEmployeeChat?.({
+        projectId,
+        runId: run.id,
+        nodeKey: key,
+        name: run.state.nodes[key].employee.name,
+        problem: run.state.nodes[key].question || run.state.nodes[key].error,
+      });
   }
   async function action(path: string, body?: unknown, method = "POST") {
     setBusy(true);
@@ -333,6 +398,18 @@ export default function AgentRunsPanel({
     }
   }
   async function submit(draft = false) {
+    let automation;
+    try {
+      automation =
+        !rerun && !editingDraft ? schedulePayload(schedule) : undefined;
+    } catch (e) {
+      setError((e as Error).message);
+      return;
+    }
+    if (automation && draft) {
+      setError("自动执行任务请直接创建，不能保存草稿");
+      return;
+    }
     const data = {
       title: (editingDraft || rerun)?.title || description.trim().slice(0, 60),
       description,
@@ -350,24 +427,44 @@ export default function AgentRunsPanel({
           }
         : {}),
     };
-    const payload = JSON.stringify(data);
+    const payload = JSON.stringify({ data, automation });
     if (submission.current.payload !== payload)
       submission.current = { payload, requestId: crypto.randomUUID() };
-    const result = await action(
-      editingDraft ? `/${editingDraft.id}` : "",
-      {
-        ...data,
-        request_id: submission.current.requestId,
-        ...(editingDraft
-          ? { expected_updated_at: editingDraft.updated_at }
-          : {}),
-      },
-      editingDraft ? "PUT" : "POST",
-    );
+    let result: Run | undefined;
+    if (automation) {
+      setBusy(true);
+      setError("");
+      try {
+        result = await api<Run>(`/workspaces/${projectId}/task-schedules`, {
+          method: "POST",
+          body: JSON.stringify({
+            task: { ...data, request_id: submission.current.requestId },
+            schedule: automation,
+          }),
+        });
+        await refresh();
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+    } else
+      result = await action(
+        editingDraft ? `/${editingDraft.id}` : "",
+        {
+          ...data,
+          request_id: submission.current.requestId,
+          ...(editingDraft
+            ? { expected_updated_at: editingDraft.updated_at }
+            : {}),
+        },
+        editingDraft ? "PUT" : "POST",
+      );
     if (result?.id) {
       setSelected(taskId(result));
       setSelectedRun(result.id);
       setCreating(false);
+      setSchedule({ ...emptySchedule });
       submission.current = { payload: "", requestId: "" };
     }
   }
@@ -567,7 +664,23 @@ export default function AgentRunsPanel({
               {
                 title: "状态",
                 key: "status",
-                render: (_, r) => <Status status={r.status} />,
+                render: (_, r) => (
+                  <Space wrap>
+                    <Status status={r.status} />
+                    {schedules
+                      .filter((p) => p.task_id === r.id)
+                      .map((p) => (
+                        <Tag key={p.id}>
+                          {p.spec.kind === "loop" ? "条件循环" : "定时执行"} ·{" "}
+                          {p.status === "active"
+                            ? "已开启"
+                            : p.status === "paused"
+                              ? "已暂停"
+                              : "已结束"}
+                        </Tag>
+                      ))}
+                  </Space>
+                ),
               },
               {
                 title: "员工进度",
@@ -585,8 +698,8 @@ export default function AgentRunsPanel({
                     ? (Object.values(r.run.state.nodes).find(
                         (n) => n.question && !n.answer,
                       )?.question ??
-                      Object.values(r.run.state.nodes).find(
-                        (n) => ["preparing", "running"].includes(n.status),
+                      Object.values(r.run.state.nodes).find((n) =>
+                        ["preparing", "running"].includes(n.status),
                       )?.activity ??
                       labels[r.status])
                     : "查看历史成果",
@@ -623,6 +736,51 @@ export default function AgentRunsPanel({
               </Space>
             </div>
             <Space wrap>
+              {schedules
+                .filter((p) => p.task_id === taskId(run))
+                .map((p) => (
+                  <Space key={p.id} wrap>
+                    <Tag>
+                      {p.spec.kind === "loop" ? "条件循环" : "定时执行"} ·{" "}
+                      {p.iterations} 次 ·{" "}
+                      {p.status === "active"
+                        ? "已开启"
+                        : p.status === "paused"
+                          ? "已暂停"
+                          : "已结束"}
+                    </Tag>
+                    {p.status === "active" && (
+                      <small>计划时间：{stamp(p.next_at)}</small>
+                    )}
+                    {p.state.reason && <small>{p.state.reason}</small>}
+                    {p.state.judgment && (
+                      <small>{p.state.judgment.reason}</small>
+                    )}
+                    {p.status !== "completed" && (
+                      <Button
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await api(
+                              `/workspaces/${projectId}/task-schedules/${p.id}/${p.status === "active" ? "pause" : "resume"}`,
+                              { method: "POST" },
+                            );
+                            await refresh();
+                          } catch (e) {
+                            setError((e as Error).message);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        {p.status === "active"
+                          ? "暂停自动执行"
+                          : "恢复自动执行"}
+                      </Button>
+                    )}
+                  </Space>
+                ))}
               {run.status === "draft" && (
                 <Button disabled={busy} onClick={() => void again(true)}>
                   编辑任务
@@ -682,9 +840,15 @@ export default function AgentRunsPanel({
             <Alert type="warning" message={run.state.error} />
           )}
           <ExecutionWorkflow
-            actions={<Space>
-              {!active && run.status !== "draft" && <Button disabled={busy} onClick={() => void again()}>再次执行</Button>}
-            </Space>}
+            actions={
+              <Space>
+                {!active && run.status !== "draft" && (
+                  <Button disabled={busy} onClick={() => void again()}>
+                    再次执行
+                  </Button>
+                )}
+              </Space>
+            }
             nodes={run.state.nodes}
             status={run.status}
             busy={busy}
@@ -711,24 +875,28 @@ export default function AgentRunsPanel({
                   }
                 />
                 <Space size={12} wrap>
-                <Button
-                  disabled={
-                    busy ||
-                    !["waiting_human", "interrupted", "cancelled"].includes(
-                      run.status,
-                    ) ||
-                    !answers[key]?.trim()
-                  }
-                  onClick={() =>
-                    void action(`/${run.id}/answer`, {
-                      node: key,
-                      answer: answers[key],
-                    })
-                  }
-                >
-                  提交答复
-                </Button>
-                {onEmployeeChat && n.employee.kind !== "human" && <Button onClick={() => openEmployeeChat(key)}>与员工对话</Button>}
+                  <Button
+                    disabled={
+                      busy ||
+                      !["waiting_human", "interrupted", "cancelled"].includes(
+                        run.status,
+                      ) ||
+                      !answers[key]?.trim()
+                    }
+                    onClick={() =>
+                      void action(`/${run.id}/answer`, {
+                        node: key,
+                        answer: answers[key],
+                      })
+                    }
+                  >
+                    提交答复
+                  </Button>
+                  {onEmployeeChat && n.employee.kind !== "human" && (
+                    <Button onClick={() => openEmployeeChat(key)}>
+                      与员工对话
+                    </Button>
+                  )}
                 </Space>
                 <small>所有问题答复后，可恢复执行。</small>
               </div>
@@ -752,16 +920,24 @@ export default function AgentRunsPanel({
         </>
       )}
       <Drawer
-        title={editingDraft ? "编辑任务" : rerun ? "再次执行任务" : "新建任务"}
+        rootClassName="task-create-drawer"
+        title={
+          <div className="task-create-title">
+            <strong>
+              {editingDraft ? "编辑任务" : rerun ? "再次执行任务" : "新建任务"}
+            </strong>
+            <span>明确交付目标，让 AI 团队开始工作</span>
+          </div>
+        }
         open={creating}
-        width="min(100vw, max(50vw, 520px))"
+        width="min(100vw, 760px)"
         onClose={() => !busy && setCreating(false)}
         footer={
-          <Space>
+          <Space className="task-create-actions">
             <Button disabled={busy} onClick={() => setCreating(false)}>
               取消
             </Button>
-            {!rerun && (
+            {!rerun && !schedule.timed && !schedule.loop && (
               <Button
                 disabled={busy || restoring || !description.trim()}
                 onClick={() => void submit(true)}
@@ -773,7 +949,8 @@ export default function AgentRunsPanel({
               type="primary"
               loading={busy}
               disabled={
-                busy || restoring ||
+                busy ||
+                restoring ||
                 !description.trim() ||
                 !formSteps.length ||
                 (scope === "workflow" && duplicateEmployees) ||
@@ -781,7 +958,11 @@ export default function AgentRunsPanel({
               }
               onClick={() => void submit(!!editingDraft)}
             >
-              {editingDraft ? "保存修改" : "开始执行"}
+              {editingDraft
+                ? "保存修改"
+                : !rerun && (schedule.timed || schedule.loop)
+                  ? "创建自动任务"
+                  : "开始执行"}
             </Button>
           </Space>
         }
@@ -794,139 +975,118 @@ export default function AgentRunsPanel({
           />
         )}
         <div className="task-create-form">
-          <label>
-            执行范围
-            <Select
-              aria-label="运行范围"
-              value={scope}
-              disabled={!!rerun || restoring}
-              onChange={setScope}
-              options={[
-                { value: "workflow", label: "团队执行" },
-                { value: "node", label: "单员工执行" },
-              ]}
-            />
-          </label>
-          {scope === "node" && (
+          <section className="task-brief-section">
+            <div className="task-section-heading">
+              <span>01</span>
+              <div>
+                <h3>任务内容</h3>
+                <p>描述期望的结果，并提供需要的资料。</p>
+              </div>
+            </div>
             <label>
-              执行员工
+              执行范围
               <Select
-                aria-label="选择员工"
-                disabled={restoring}
-                value={node}
-                onChange={setNode}
-                options={formSteps
-                  .filter(
-                    (s, i, all) =>
-                      all.findIndex((other) => other.owner === s.owner) === i,
-                  )
-                  .filter(
-                    (s) =>
-                      !formMembers.length ||
-                      formMembers.find((m) => m.key === s.owner)?.kind === "ai",
-                  )
-                  .map((s) => ({
-                    value: s.key,
-                    label:
-                      formMembers.find((m) => m.key === s.owner)?.name ??
-                      s.name,
-                  }))}
+                aria-label="运行范围"
+                value={scope}
+                disabled={!!rerun || restoring}
+                onChange={setScope}
+                options={[
+                  { value: "workflow", label: "团队执行" },
+                  { value: "node", label: "单员工执行" },
+                ]}
               />
-              <small>
-                只执行这名员工；缺少的上游输入请在下方补充，不会自动运行其他员工。
-              </small>
             </label>
-          )}
-          <label>
-            工作要求
-            <Input.TextArea
-              aria-label="任务输入"
-              disabled={restoring}
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="说明本次要完成什么"
-              maxLength={20000}
-            />
-          </label>
-          <Upload
-            disabled={restoring}
-            multiple
-            showUploadList={false}
-            beforeUpload={async (file) => {
-              try {
-                if (file.size > 10_000_000)
-                  throw new Error("单个文件不能超过10MB");
-                const data = await encodeFile(file);
-                setAttachments((old) => [
-                  ...old.filter((f) => f.name !== file.name),
-                  { name: file.name, data },
-                ]);
-              } catch (e) {
-                setError(String(e));
-              }
-              return false;
-            }}
-          >
-            <Button icon={<UploadOutlined />}>上传输入文件</Button>
-          </Upload>
-          {attachments.map((f) => (
-            <Tag
-              closable={!restoring}
-              onClose={() =>
-                setAttachments((old) => old.filter((a) => a.name !== f.name))
-              }
-              key={f.name}
-            >
-              {f.name}
-            </Tag>
-          ))}
-          <Select<string>
-            aria-label="已上传的文件"
-            placeholder="选择已上传的文件"
-            showSearch optionFilterProp="label" value={undefined} disabled={restoring}
-            options={runs.flatMap(r => (r.inputs?.attachments ?? []).map(f => ({value:JSON.stringify({run:r.id,path:f.path}),label:`${f.name} · ${r.title}`})))}
-            onChange={async value => {
-              const selected = JSON.parse(value);
-              const source = runs.find(r => r.id === selected.run);
-              const file = source?.inputs?.attachments?.find(f => f.path === selected.path);
-              if (!source || !file) return;
-              try {
-                const attachment = await readInputFile(source,file);
-                setAttachments(old => [...old.filter(f => f.name !== attachment.name), attachment]);
-              } catch(e) {setError(String(e));}
-            }}
-          />
-          <Select<string>
-            aria-label="引用已有成果"
-            placeholder="选择已有执行成果作为输入"
-            value={undefined}
-            options={runs.flatMap((r) =>
-              Object.values(r.state.nodes).flatMap((n) =>
-                n.artifacts.map((f) => ({
-                  value: JSON.stringify({ run: r.id, path: f.path }),
-                  label: `${r.title} · ${n.employee.name} · ${f.path.split("/").pop()}`,
-                })),
-              ),
+            {scope === "node" && (
+              <label>
+                执行员工
+                <Select
+                  aria-label="选择员工"
+                  disabled={restoring}
+                  value={node}
+                  onChange={setNode}
+                  options={formSteps
+                    .filter(
+                      (s, i, all) =>
+                        all.findIndex((other) => other.owner === s.owner) === i,
+                    )
+                    .filter(
+                      (s) =>
+                        !formMembers.length ||
+                        formMembers.find((m) => m.key === s.owner)?.kind ===
+                          "ai",
+                    )
+                    .map((s) => ({
+                      value: s.key,
+                      label:
+                        formMembers.find((m) => m.key === s.owner)?.name ??
+                        s.name,
+                    }))}
+                />
+                <small>
+                  只执行这名员工；缺少的上游输入请在下方补充，不会自动运行其他员工。
+                </small>
+              </label>
             )}
-            onChange={async (value) => {
-              try {
-                const f = JSON.parse(value);
-                const response = await fetch(
-                  `/api${base}/${f.run}/artifact?path=${encodeURIComponent(f.path)}`,
-                );
-                if (!response.ok) throw new Error("成果读取失败");
-                const data = await encodeFile(await response.blob());
-                const name = `引用-${f.run.slice(-6)}-${f.path.split("/").pop()}`;
-                setAttachments((old) => [
-                  ...old.filter((a) => a.name !== name),
-                  { name, data },
-                ]);
-              } catch (e) {
-                setError(String(e));
-              }
-            }}
-          />
+            <label>
+              工作要求
+              <Input.TextArea
+                aria-label="任务输入"
+                disabled={restoring}
+                rows={4}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="说明本次要完成什么"
+                maxLength={20000}
+              />
+            </label>
+            <div className="task-upload-area">
+              <div>
+                <strong>输入文件</strong>
+                <small>
+                  可选 · 补充文档、图片或原始数据，单个文件不超过 10 MB
+                </small>
+              </div>
+              <Upload
+                disabled={restoring}
+                multiple
+                showUploadList={false}
+                beforeUpload={async (file) => {
+                  try {
+                    if (file.size > 10_000_000)
+                      throw new Error("单个文件不能超过10MB");
+                    const data = await encodeFile(file);
+                    setAttachments((old) => [
+                      ...old.filter((f) => f.name !== file.name),
+                      { name: file.name, data },
+                    ]);
+                  } catch (e) {
+                    setError(String(e));
+                  }
+                  return false;
+                }}
+              >
+                <Button icon={<UploadOutlined />}>上传输入文件</Button>
+              </Upload>
+            </div>
+            <div className="task-upload-files">
+              {attachments.map((f) => (
+                <Tag
+                  closable={!restoring}
+                  onClose={() =>
+                    setAttachments((old) =>
+                      old.filter((a) => a.name !== f.name),
+                    )
+                  }
+                  key={f.name}
+                >
+                  {f.name}
+                </Tag>
+              ))}
+            </div>
+          </section>
+          {!rerun && !editingDraft && (
+            <TaskScheduleFields value={schedule} onChange={setSchedule} />
+          )}
           {rerun && (
             <Checkbox
               checked={useLatest}
@@ -935,7 +1095,6 @@ export default function AgentRunsPanel({
               使用团队最新配置（默认沿用原执行配置）
             </Checkbox>
           )}
-
         </div>
       </Drawer>
       <Drawer
@@ -1068,9 +1227,22 @@ export default function AgentRunsPanel({
           {preview?.text ?? preview?.reason}
         </pre>
       </Drawer>
-      <Drawer title="Agent 日志" open={activityNode !== undefined && !!run}
-        onClose={() => setActivityNode(undefined)} width="min(100vw, max(50vw, 520px))" destroyOnHidden>
-        {activityNode !== undefined && run && <AgentActivity key={`${run.id}-${activityNode}`} projectId={projectId} runId={run.id} nodes={run.state.nodes} initialNode={activityNode} />}
+      <Drawer
+        title="Agent 日志"
+        open={activityNode !== undefined && !!run}
+        onClose={() => setActivityNode(undefined)}
+        width="min(100vw, max(50vw, 520px))"
+        destroyOnHidden
+      >
+        {activityNode !== undefined && run && (
+          <AgentActivity
+            key={`${run.id}-${activityNode}`}
+            projectId={projectId}
+            runId={run.id}
+            nodes={run.state.nodes}
+            initialNode={activityNode}
+          />
+        )}
       </Drawer>
       <Drawer
         title="执行文件"

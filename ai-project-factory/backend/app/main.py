@@ -30,6 +30,7 @@ from .chat_attachments import install_chat_attachments, message_attachments, bin
 from .workspaces import Workspaces
 from .dashboards import DashboardService, install_dashboards
 from .agent_runs import AgentRuns, install_agent_runs
+from .task_schedule import TaskScheduler, install_task_schedules
 from .workspace_browser import install_workspace_browser
 from .models import DeletedTeam, Evaluation, now
 from .agent_models import AgentTask, AgentRun
@@ -69,6 +70,7 @@ def create_app(settings=None, runtime=None):
     evidence = EvidenceManager(sessions, runtime, settings)
     workspaces = Workspaces(settings, sessions)
     agent_runs = AgentRuns(sessions, settings, workspaces)
+    scheduler = TaskScheduler(agent_runs)
     project_tools = ProjectTools(sessions, manager, evidence)
     project_tools.agent_runs = agent_runs
     dashboards = DashboardService(sessions, agent_runs)
@@ -81,7 +83,9 @@ def create_app(settings=None, runtime=None):
         manager.recover()
         evidence.recover()
         agent_runs.recover()
+        scheduler.start()
         yield
+        await scheduler.close()
         await manager.shutdown()
         await evidence.shutdown()
         await agent_runs.shutdown()
@@ -97,6 +101,8 @@ def create_app(settings=None, runtime=None):
     install_dashboards(app, dashboards)
     app.state.agent_runs = agent_runs
     install_agent_runs(app, agent_runs)
+    install_task_schedules(app, scheduler)
+    app.state.task_scheduler = scheduler
     install_workspace_browser(app, workspaces, agent_runs)
     install_project_tools(app, project_tools)
     install_evidence(app, evidence)

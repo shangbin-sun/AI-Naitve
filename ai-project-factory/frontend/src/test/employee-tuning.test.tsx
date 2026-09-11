@@ -28,7 +28,7 @@ it("对话发送到员工节点，关闭不停止任务",async()=>{
 it("更新能力直接触发保存，不弹出编辑框",async()=>{
   mock.mockResolvedValue({status:"idle",messages:[],read_only:false,can_start:true,report:{passed:true,verification:"重复的验证结果"}});
   render(<EmployeeTuning {...props}/>);
-  await userEvent.click(await screen.findByRole("button",{name:"更新员工能力"}));
+  await userEvent.click(await screen.findByRole("button",{name:"增强员工能力"}));
   await waitFor(()=>expect(mock).toHaveBeenCalledWith(expect.stringContaining("/tuning"),expect.objectContaining({method:"POST",body:expect.stringContaining('"auto_apply":true')})));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(screen.queryByText("修复验证通过")).toBeNull();

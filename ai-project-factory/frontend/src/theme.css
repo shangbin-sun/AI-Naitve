@@ -36,7 +36,7 @@
 .sidebar .brand { color: var(--text-heading); }
 .sidebar .brand-mark { background: var(--primary); border-color: transparent; box-shadow: none; color: white; }
 .sidebar .brand-mark span { color: #e7e8ff; }
-.sidebar .brand small, .sidebar .nav-label, .sidebar .recent-heading,
+.sidebar .nav-label, .sidebar .recent-heading,
 .sidebar .sidebar-hint, .sidebar .sidebar-footer, .sidebar .runtime-card small,
 .sidebar .sidebar-teams-heading, .sidebar .sidebar-team-list p { color: var(--text-muted); }
 .sidebar .nav-item, .sidebar .recent, .sidebar .sidebar-team-item,
@@ -83,7 +83,6 @@
   border-right: 1px solid #dfe6f0;
 }
 .sidebar .brand { letter-spacing: -.4px; font-weight: 650; }
-.sidebar .brand small { letter-spacing: 2px; }
 .sidebar .brand-mark {
   border-radius: 12px;
   background: linear-gradient(145deg, #5685ff, #6655ed);

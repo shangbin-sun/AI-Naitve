@@ -63,7 +63,8 @@ it("新任务默认复用上次团队输入和附件", async () => {
     await waitFor(()=>expect(screen.getByLabelText("任务输入")).toHaveValue("上次要求"));
     await screen.findByText("source.txt");
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("run_id=latest"));
-    expect(screen.getByRole("combobox", {name:"已上传的文件"})).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", {name:"已上传的文件"})).toBeNull();
+    expect(screen.queryByText("选择已有执行成果作为输入")).toBeNull();
   } finally {fetchMock.mockRestore();}
 });
 it("员工入口只复用该员工的输入，不继承团队输入", async () => {

@@ -471,7 +471,7 @@ export default function FactoryApp() {
             A<span>·</span>
           </span>
           <div>
-            AI 工作室<small>AI STUDIO</small>
+            AI Team
           </div>
         </a>
         <button className="sidebar-create-team" aria-label="新建AI团队" title="新建AI团队" onClick={() => {
@@ -860,7 +860,7 @@ export default function FactoryApp() {
         {view === "projects" && (
           <section className={`library project-library${designs.length ? "" : " project-library-empty"}`}>
             {!designs.length ? (
-              <Empty className="spaced" description="从第一个目标开始">
+              <Empty className="spaced" description="组建你的 AI 团队，让工作持续交付">
                 <Button
                   onClick={() => {setText(""); requestTeamName();}}
                 >
