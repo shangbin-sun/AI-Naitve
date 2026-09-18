@@ -394,6 +394,70 @@
   gap: 12px;
 }
 
+.employee-workflow-editor {
+  margin: 18px auto 0;
+  width: min(1180px, calc(100% - 32px));
+  padding: 18px;
+  border: 1px solid #cbd8f4;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f7faff, #ffffff);
+  box-shadow: 0 8px 26px rgba(35, 65, 120, .08);
+}
+.employee-workflow-editor-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.employee-workflow-editor-heading h3 {
+  margin: 8px 0;
+  color: var(--text-primary);
+}
+.employee-workflow-editor-heading > div:first-child { flex: 1; min-width: 0; }
+.employee-workflow-editor .employee-workflow-steps { grid-template-columns: 1fr; }
+.employee-workflow-form-grid label { display: grid; gap: 7px; align-content: start; }
+.employee-workflow-form-grid label > span { color: #53627a; font-weight: 600; font-size: 12px; }
+.workflow-compare .employee-workflow-form-grid { grid-template-columns: 1fr; }
+.employee-workflow-editor-heading small,
+.employee-workflow-editor-hint {
+  display: block;
+  color: var(--text-muted);
+}
+.employee-workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.employee-workflow-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+.employee-workflow-form-grid > :last-child {
+  grid-column: 1 / -1;
+}
+.employee-workflow-editor-hint {
+  margin-top: 12px;
+}
+.workflow-compare-heading, .workflow-compare-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.workflow-compare-heading { padding: 14px 18px; background: #edf2ff; border-radius: 12px; margin-bottom: 14px; }
+.workflow-compare-heading small { display: block; margin-top: 8px; font-weight: normal; }
+.workflow-compare { display: grid; gap: 16px; }
+.workflow-previous { padding: 18px; border: 1px solid #e0e6ef; background: #f8fafc; border-radius: 12px; }
+.workflow-previous small { display: block; color: #718096; margin-top: 12px; }
+.workflow-previous p { white-space: pre-wrap; margin: 6px 0; }
+.workflow-field-changed { background: #fff2d9; border-radius: 6px; padding: 1px 8px; }
+.workflow-empty { display: grid; place-content: center; border: 1px dashed #ccd4e0; border-radius: 12px; padding: 28px; color: #718096; }
+.workflow-save-bar { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 18px; margin-top: 20px; background: #fff; border-top: 1px solid #e0e6ef; }
+@media (max-width: 760px) { .workflow-compare-heading, .workflow-compare-row { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .employee-workflow-editor-heading { flex-direction: column; }
+  .employee-workflow-form-grid { grid-template-columns: 1fr; }
+  .employee-workflow-form-grid > :last-child { grid-column: auto; }
+}
+
 .employee-context-summary {
   color: var(--text-body);
   line-height: 1.75;
@@ -714,3 +778,21 @@
     flex-direction: column;
   }
 }
+.workflow-method-intro { color: #68758b; line-height: 1.7; }
+.workflow-method-fields { display: grid; gap: 16px; }
+.workflow-method-fields label { display: grid; gap: 7px; min-width: 0; }
+.workflow-method-fields label > span { color: #55627b; font-weight: 500; }
+.workflow-action-card { border-radius: 14px; border-color: #e4e7f0; overflow: hidden; }
+.workflow-action-card .ant-card-head { background: #f7f8fd; }
+.workflow-method-details { margin-top: 16px; border-top: 1px solid #e8ecf4; padding-top: 12px; }
+.workflow-method-details summary { cursor: pointer; color: #626d86; padding: 5px 0; }
+.workflow-method-details[open] summary { margin-bottom: 12px; }
+.workflow-chat-excerpt { padding: 12px 16px; margin-top: 8px; border-left: 3px solid #b6b3f0; background: #f7f8fc; border-radius: 0 8px 8px 0; }
+.workflow-chat-excerpt small { color: #66718b; }
+.workflow-chat-excerpt p { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; line-height: 1.7; margin-bottom: 0; }
+.workflow-global-contract { margin: 20px 0 28px; padding: 20px; background: #f7f8fd; border: 1px solid #e4e7f0; border-radius: 14px; }
+.workflow-global-contract h4 { margin: 16px 0 10px; }
+.workflow-global-contract > h4:first-child { margin-top: 0; }
+.workflow-contract-item { margin-bottom: 12px; padding: 14px; border: 1px solid #e4e7f0; border-radius: 10px; background: #fff; }
+.workflow-contract-item-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.workflow-contract-item-heading .ant-input { min-width: 0; }

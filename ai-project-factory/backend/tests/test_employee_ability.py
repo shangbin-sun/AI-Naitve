@@ -6,11 +6,15 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 from app.agent_models import AgentRun
-from app.employee_ability import AbilityUpdate, VerifyEmployee
+from app.employee_ability import AbilityUpdate, VerifyEmployee, WorkflowUpdate
 from app.employee_tuning import TuningMessage
 from app.models import Employee
 from app.chat_attachments import ChatAttachment
 from test_employee_tuning import manager, blocked, endpoint, Connection
+
+WORKFLOW = {'version': 1, 'title': '检查流程', 'goal': '检查环境', 'steps': [
+    {'id': 'S01', 'name': '检查', 'goal': '检查环境', 'acceptance': '检查通过',
+     'requirements': [], 'actions': [], 'input': '', 'output': ''}]}
 
 
 def test_save_rules_and_skill_then_verify_uses_new_version_clean_workspace(manager):
@@ -59,7 +63,7 @@ def test_generate_ability_readonly_and_image_content_reaches_employee(manager):
         async def run_turn(self,thread,inputs,event,turn,identity):
             seen.extend(inputs)
             await turn('ability-turn')
-            await event({'type':'reply','text':json.dumps({'summary':'增加环境检查','instructions':'先检查环境','files':files})})
+            await event({'type':'reply','text':json.dumps({'summary':'增加环境检查','instructions':'先检查环境','files':files,'workflow':WORKFLOW})})
     manager.connection_factory=ProposalConnection
     async def send():
         await endpoint(manager)(manager.project_id,run['id'],'analyze',TuningMessage(content='根据截图整理能力',purpose='ability',attachment_ids=[attachment_id],request_id='one'))
@@ -80,7 +84,7 @@ def test_one_click_ability_update_saves_or_rejects_invalid_skill(manager, invali
     class Auto(Connection):
         async def run_turn(self,thread,inputs,event,turn,identity):
             await turn('auto-ability')
-            await event({'type':'reply','text':json.dumps({'summary':'已补充环境检查方法','instructions':'先检查环境，再执行。','files':files})})
+            await event({'type':'reply','text':json.dumps({'summary':'已补充环境检查方法','instructions':'先检查环境，再执行。','files':files,'workflow':WORKFLOW})})
     manager.connection_factory=Auto
     async def send():
         await endpoint(manager)(manager.project_id,run['id'],'analyze',TuningMessage(content='整理并保存能力',purpose='ability',auto_apply=True,request_id='auto'))
@@ -88,15 +92,24 @@ def test_one_click_ability_update_saves_or_rejects_invalid_skill(manager, invali
     asyncio.run(send())
     result=endpoint(manager,method='GET')(manager.project_id,run['id'],'analyze')
     with manager.sessions() as db:
+        assert db.query(Employee).one().version == version
+    proposal = result['ability_proposal']
+    body = WorkflowUpdate(workflow=WORKFLOW, expected_version=version, proposal_id=proposal['id'])
+    if invalid:
+        with pytest.raises(HTTPException):
+            endpoint(manager,'/workflow')(manager.project_id,run['id'],'analyze',body)
+    else:
+        endpoint(manager,'/workflow')(manager.project_id,run['id'],'analyze',body)
+        with pytest.raises(HTTPException):
+            endpoint(manager,'/workflow')(manager.project_id,run['id'],'analyze',body)
+    with manager.sessions() as db:
         employee=db.query(Employee).one()
         if invalid:
             assert employee.version==version
-            assert result['status']=='interrupted'
         else:
             assert employee.version==version+1
             assert employee.profile['instructions']=='先检查环境，再执行。'
-            assert '已更新员工能力至' in result['messages'][-1]['content']
-            assert result['ability_updates'][-1]['version']==employee.version
+            assert json.loads(employee.files['workflow.json'])['steps'][0]['id'] == 'S01'
 
 
 def test_verification_from_multiple_chats_shares_task_and_adds_clean_runs(manager):

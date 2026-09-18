@@ -1,4 +1,7 @@
+import { requestId } from "./requestId";
 import EmployeeWorkflow from "./workflow/EmployeeWorkflow";
+import EmployeeWorkflowTab from "./tasks/EmployeeWorkflowTab";
+import EmployeeEvaluation from './EmployeeEvaluation';
 import TeamContextMenu from "./TeamContextMenu";
 import {
   lazy,
@@ -263,7 +266,7 @@ export default function FactoryApp() {
         requestRef.current.designId !== id
       )
         requestRef.current = {
-          id: crypto.randomUUID(),
+          id: requestId(),
           content: JSON.stringify([value, attachmentIds, employeeReference]),
           designId: id,
         };
@@ -334,8 +337,10 @@ export default function FactoryApp() {
     setText(value);
   }
   function openEditor(employee: Employee) {
+    // List entries can predate a workflow saved from a task conversation.
+    // Let the route loader fetch the canonical employee before mounting editor.
+    setEditor(null);
     navigate(view, active, projectTab, false, employee.id);
-    setEditor(employee);
   }
   function closeEditor() {
     setEditor(null);
@@ -806,7 +811,7 @@ export default function FactoryApp() {
             <div className="library-heading">
               <div className="eyebrow small">EMPLOYEE WORKSHOP</div>
               <h1>员工</h1>
-              <p>集中完善员工指令与工程文件。日常团队协作请进入所属AI 团队。</p>
+              <p>集中查看和编辑员工 WorkFlow、工作指令与工程文件。日常团队协作请进入所属AI 团队。</p>
             </div>
             {!employees.length ? (
               <Empty description="还没有员工工程">
@@ -1334,8 +1339,14 @@ export function EmployeeEditor({
         onChange={setTab}
         items={[
           {
+            key: "workflow",
+            label: "WorkFlow",
+            children: <EmployeeWorkflowTab files={files} saving={saving} dirty={dirty}
+              onChange={next => { setFiles(next); setDirty(true); }} onSave={() => void save()} />,
+          },
+          {
             key: "profile",
-            label: "岗位与能力",
+            label: "岗位定义",
             children: (
               <div className="profile-form">
                 <label>
@@ -1353,15 +1364,13 @@ export function EmployeeEditor({
                   />
                 </label>
                 {(
-                  ["responsibilities", "skills", "inputs", "outputs"] as const
+                  ["responsibilities", "skills"] as const
                 ).map((k, i) => (
                   <label key={k}>
                     {
                       [
                         "职责（每行一项）",
                         "技能需求（每行一项）",
-                        "工作输入（每行一项）",
-                        "交付成果（每行一项）",
                       ][i]
                     }
                     <Input.TextArea
@@ -1373,14 +1382,6 @@ export function EmployeeEditor({
                     />
                   </label>
                 ))}
-                <label>
-                  员工工作指令
-                  <Input.TextArea
-                    rows={10}
-                    value={profile.instructions}
-                    onChange={(e) => patch({ instructions: e.target.value })}
-                  />
-                </label>
               </div>
             ),
           },
@@ -1481,30 +1482,12 @@ export function EmployeeEditor({
           },
           {
             key: "evaluation",
-            label: "评测要求",
+            label: "评测与调优",
             children: (
-              <>
-                <Alert
-                  showIcon
-                  type="info"
-                  message="当前版本支持定义评测样例；自动试运行与正式发布尚未实现。"
-                />
-                <h3 className="spaced">评测前需要确认</h3>
-                <ul className="evaluation-list">
-                  <li>岗位指令清楚，输入与输出约定完整。</li>
-                  <li>外部工具、依赖和资源已准备好。</li>
-                  <li>在 evaluations/example.json 中完善样例。</li>
-                  <li>覆盖失败、缺少资料和人工介入的情况。</li>
-                </ul>
-                <Button
-                  onClick={() => {
-                    setTab("files");
-                    setSelected("evaluations/example.json");
-                  }}
-                >
-                  编辑评测样例 <ArrowRightOutlined />
-                </Button>
-              </>
+              <><EmployeeEvaluation employeeId={employee.id} version={version} disabled={dirty || saving} onAdopted={async()=>{
+                const updated = await api<Employee>(`/employees/${employee.id}`);
+                setVersion(updated.version);setFiles(updated.files);setProfile(updated.profile);await onSave(updated);
+              }}/><Button onClick={()=>{setTab('files');setSelected('evaluations/example.json');}}>编辑评测样例</Button></>
             ),
           },
         ]}

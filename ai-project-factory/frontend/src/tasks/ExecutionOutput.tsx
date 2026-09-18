@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Drawer, Empty, Table } from "antd";
 import { CodeOutlined, FileTextOutlined } from "@ant-design/icons";
 import { api } from "../api";
-export type OutputFile = { path: string; description?: string; size?: number };
+export type OutputFile = { path: string; description?: string; size?: number; revision?: string; sha256?: string };
 export function cleanOutputText(text: string, root: string) {
   return text
     .replaceAll(root || "\u0000", "当前任务")
@@ -58,7 +58,9 @@ export default function ExecutionOutput({
   status,
   summary,
   error,
-  files,
+  files: savedFiles,
+  readOutputs = false,
+  nodeKey,
 }: {
   projectId: string;
   runId: string;
@@ -68,19 +70,44 @@ export default function ExecutionOutput({
   summary?: string;
   error?: string;
   files: OutputFile[];
+  readOutputs?: boolean;
+  nodeKey?: string;
 }) {
+  const [outputs, setOutputs] = useState<{files: OutputFile[]; summary: string; source: string; warnings: string[]}>();
+  const [outputError, setOutputError] = useState("");
+  useEffect(() => {
+    if (!readOutputs) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    setOutputs(undefined);
+    const poll = async () => {
+      try {
+        const value = await api<NonNullable<typeof outputs>>(
+          `/workspaces/${projectId}/agent-runs/${runId}/outputs${nodeKey ? `?node=${encodeURIComponent(nodeKey)}` : ""}`,
+        );
+        if (alive) { setOutputs(value); setOutputError(""); }
+      } catch {
+        if (alive) setOutputError("最新产物读取失败，当前显示的数据可能已过期；正在重试。");
+      } finally {
+        if (alive) timer = setTimeout(poll, 2500);
+      }
+    };
+    void poll();
+    return () => { alive = false; clearTimeout(timer); };
+  }, [projectId, runId, nodeKey, readOutputs, status]);
+  const files = outputs?.files ?? savedFiles;
   const [selected, setSelected] = useState<string>(),
     [preview, setPreview] = useState(""),
     [problem, setProblem] = useState(""),
     [opening, setOpening] = useState<string>();
   const [summaries, setSummaries] = useState<Record<string, string>>({});
   const missingKey = JSON.stringify(
-    files.filter((f) => !f.description).map((f) => f.path),
+    files.filter((f) => !f.description).map((f) => [f.path, f.revision ?? f.sha256]),
   );
   useEffect(() => {
     let alive = true;
     setSummaries({});
-    const paths: string[] = JSON.parse(missingKey);
+    const paths: string[] = JSON.parse(missingKey).map((item: [string, unknown]) => item[0]);
     let cursor = 0;
     const worker = async () => {
       while (cursor < paths.length) {
@@ -111,6 +138,7 @@ export default function ExecutionOutput({
     };
   }, [projectId, runId, missingKey]);
   const path = files.some((f) => f.path === selected) ? selected : undefined;
+  const revision = files.find((f) => f.path === path)?.revision ?? files.find((f) => f.path === path)?.sha256;
   useEffect(() => {
     let alive = true;
     setPreview("");
@@ -128,7 +156,7 @@ export default function ExecutionOutput({
     return () => {
       alive = false;
     };
-  }, [projectId, runId, path]);
+  }, [projectId, runId, path, revision]);
   const fallback =
     status === "completed"
       ? `执行完成，已提交 ${files.length} 份成果。`
@@ -171,8 +199,11 @@ export default function ExecutionOutput({
     <section className="execution-output">
       <h3>执行总结</h3>
       <p className="task-text">
-        {executionSummary(summary || fallback, files, root)}
+        {executionSummary(outputs?.summary || summary || fallback, files, root)}
       </p>
+      {readOutputs && <small>{outputs?.source === "snapshot" ? "历史提交快照" : "当前输出目录 · 自动刷新（不代表已提交或任务成功）"}</small>}
+      {outputError && <Alert type="warning" message={outputError} />}
+      {outputs?.warnings?.map((warning) => <Alert key={warning} type="warning" message={warning} />)}
       {error && ["failed", "interrupted", "cancelled"].includes(status) && <Alert type="error" message={cleanOutputText(error, root)} />}
       <div className="output-files-header">
         <h3>

@@ -98,6 +98,7 @@ def reset_node(node, reason):
     if node.get('attempt'): history.append({**prior,'archived_at':now(),'reason':reason})
     node.update(status='pending',attempt=None,thread_id=None,artifacts=[])
     for key in ('question','answer','error','preparing_at','started_at','finished_at','activity','verification','summary','warnings','tuning'): node.pop(key,None)
+    for key in ('acceptance_record','submission_id','pending_turn','pending_message','pending_mode','pending_send','before_discussion','input_manifest','upstream_versions','snapshot_digest','instruction_bundle','live_reply','messages','conversation_requests'): node.pop(key,None)
 
 
 class Review(BaseModel):
@@ -177,6 +178,14 @@ def install_task_center(app, manager):
             if run.status!='awaiting_review' or run_id in manager.tasks: raise HTTPException(409,'当前执行不在待验收状态')
             state=copy.deepcopy(run.state)
             if data.approved:
+                if state.get('engine') == 'independent-v1':
+                    from .independent_runs import verify_files
+                    if not all(n['status']=='completed' and n.get('acceptance_record') for n in state['nodes'].values()):
+                        raise HTTPException(409,'必须先验收所有员工节点')
+                    try:
+                        for node in state['nodes'].values(): verify_files(manager.directory(task,run),node['artifacts'])
+                    except ValueError as exc: raise HTTPException(409,str(exc)) from exc
+                    write_json(manager.directory(task,run)/'outputs/index.json',{k:n['artifacts'] for k,n in state['nodes'].items()})
                 run.status='completed';state['finished_at']=now()
             else:
                 if not data.note.strip() or data.node not in state['nodes']: raise HTTPException(422,'请选择退回员工并说明原因')

@@ -19,6 +19,7 @@ const labels: Record<string, string> = {
   preparing: "准备中",
   running: "执行中",
   completed: "已完成",
+  awaiting_review: "待验收",
   failed: "失败",
   waiting_human: "等待人工",
   interrupted: "已中断",

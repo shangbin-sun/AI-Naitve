@@ -20,6 +20,13 @@ SKILL_PATH = Path(__file__).parent / 'skills/project-operations/SKILL.md'
 
 
 
+class CodexTurnError(RuntimeError):
+    def __init__(self, error):
+        self.detail = error
+        self.invalid_schema = 'invalid_json_schema' in json.dumps(error, ensure_ascii=False)
+        super().__init__('Codex 输出 Schema 被模型接口拒绝' if self.invalid_schema else 'Codex 本轮未完成；会话保留，可继续对话')
+
+
 class CodexRPCError(RuntimeError):
     def __init__(self, error):
         self.code = error.get('code')
@@ -57,8 +64,9 @@ class CodexConnection:
                 mark('connection_reused')
                 return
             await self.close()
+            model_args = ['-c', f'model={json.dumps(self.settings.codex_model)}'] if self.settings.codex_model else []
             self.proc = await asyncio.create_subprocess_exec(
-                self.settings.codex_bin, 'app-server', '--listen', 'stdio://',
+                self.settings.codex_bin, *model_args, 'app-server', '--listen', 'stdio://',
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL, start_new_session=True, limit=4_000_000,
                 env={**os.environ, **self.process_env})
@@ -90,6 +98,10 @@ class CodexConnection:
             await self.proc.stdin.drain()
 
     async def rpc(self, method, params):
+        # Apply the application's model to both new and previously persisted chats.
+        # Never inherit a resumed thread's old model or change the user's global config.
+        if self.settings.codex_model and method in ('thread/start', 'thread/resume', 'thread/fork', 'turn/start'):
+            params = {**params, 'model': self.settings.codex_model}
         self.sequence += 1
         identity = self.sequence
         future = asyncio.get_running_loop().create_future()
@@ -213,7 +225,7 @@ class CodexConnection:
         mark('thread_ready', thread_id=thread_id, actual_model=result.get('model'), model_provider=result.get('modelProvider'))
         return thread_id
 
-    async def run_turn(self, thread_id, inputs, on_event, on_turn, message_id, schema=None):
+    async def run_turn(self, thread_id, inputs, on_event, on_turn, message_id, schema=None, response_model=DesignResponse, sandbox_policy=None):
         queue = asyncio.Queue()
         if thread_id in self.queues:
             raise RuntimeError('该 Codex 会话仍在运行，请等待或停止后重试')
@@ -226,6 +238,8 @@ class CodexConnection:
                       'clientUserMessageId': message_id, 'effort': self.settings.chat_reasoning_effort}
             if schema is not None:
                 params['outputSchema'] = schema
+            if sandbox_policy is not None:
+                params['sandboxPolicy'] = sandbox_policy
             mark('turn_sent', thread_id=thread_id,
                  input_text_bytes=sum(len(item.get('text', '').encode()) for item in inputs),
                  schema_bytes=len(json.dumps(schema).encode()) if schema else 0)
@@ -269,10 +283,10 @@ class CodexConnection:
                         continue
                     finished = True
                     if data['turn']['status'] != 'completed':
-                        raise RuntimeError('Codex 本轮未完成；会话保留，可继续对话')
+                        raise CodexTurnError(data['turn'].get('error'))
                     mark('turn_completed', usage=usage)
                     if schema:
-                        result = DesignResponse.model_validate_json(list(texts.values())[-1] if texts else '')
+                        result = response_model.model_validate_json(list(texts.values())[-1] if texts else '')
                         mark('schema_validated')
                     else:
                         result = ChatResponse(reply='\n\n'.join(texts.values()), draft=None)

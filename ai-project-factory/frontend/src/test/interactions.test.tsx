@@ -88,7 +88,39 @@ beforeEach(() => {
   mocked.mockReset();
 });
 
+it('打开员工详情重新读取已保存 WorkFlow，不使用旧列表文件', async () => {
+  window.history.replaceState(null,'','#/employees');
+  const workflow={version:1,title:'新保存的方法',goal:'交付',approach:'检查资料',inputs:[],outputs:[],steps:[{id:'S01',name:'核实',goal:'核实',input:'',output:'',acceptance:'',actions:[],requirements:[]}]};
+  mocked.mockImplementation(async path => {
+    if(path==='/workspaces')return [design];
+    if(path==='/employees')return [employee];
+    if(path==='/employees/employee-1')return {...employee,version:2,files:{...employee.files,'workflow.json':JSON.stringify(workflow)}};
+    return {};
+  });
+  mount(<Factory/>);
+  const name=await screen.findByRole('button',{name:/测试分析员.*需求分析/});
+  await userEvent.click(name);
+  await userEvent.click(await screen.findByRole('tab',{name:'WorkFlow'}));
+  expect(await screen.findByText('新保存的方法')).toBeInTheDocument();
+  expect(mocked).toHaveBeenCalledWith('/employees/employee-1');
+});
+
 describe("员工编辑器", () => {
+  it("岗位定义不再提供输入输出或工作指令表单，保存保留兼容数据", async () => {
+    mocked.mockResolvedValue({...employee, version: 2});
+    const {user} = editor();
+    expect(screen.getByRole("tab", {name: "岗位定义"})).toBeVisible();
+    expect(screen.queryByLabelText("工作输入（每行一项）")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("交付成果（每行一项）")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("员工工作指令")).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("员工名称"), "更新");
+    await user.click(screen.getByRole("button", {name: /保存修改/}));
+    const write = mocked.mock.calls.find(([, options]) => options?.method === "PUT")!;
+    const payload = JSON.parse(write[1]!.body as string);
+    expect(payload.profile.inputs).toEqual(member.inputs);
+    expect(payload.profile.outputs).toEqual(member.outputs);
+    expect(payload.profile.instructions).toBe(member.instructions);
+  });
   it("无修改时关闭按钮直接关闭", async () => {
     const { user, onClose } = editor();
     expect(screen.getByRole("button", { name: /保存修改/ })).toBeDisabled();
@@ -150,7 +182,8 @@ describe("员工编辑器", () => {
     expect(screen.getByLabelText("工程文件内容")).toHaveValue("# 员工说明");
     await user.click(screen.getByRole("button", { name: /src\/work.py/ }));
     expect(screen.getByLabelText("工程文件内容")).toHaveValue("print(42)");
-    await user.click(screen.getByRole("tab", { name: "评测要求" }));
+    mocked.mockResolvedValue([]);
+    await user.click(screen.getByRole("tab", { name: "评测与调优" }));
     await user.click(screen.getByRole("button", { name: /编辑评测样例/ }));
     expect(screen.getByLabelText("工程文件内容")).toHaveValue("{}");
   });
@@ -403,7 +436,7 @@ describe("整页导航", () => {
     const user = factory();
     await user.click(screen.getByRole("button", { name: /^robot 员工$/ }));
     await user.click(await screen.findByRole("button", { name: /测试分析员/ }));
-    await user.type(screen.getByLabelText("员工名称"), "未保存");
+    await user.type(await screen.findByLabelText("员工名称"), "未保存");
     await user.click(screen.getByRole("link", { name: "返回团队首页" }));
     await user.click(await screen.findByRole("button", { name: "继续编辑" }));
     expect(screen.getByLabelText("员工名称")).toHaveValue("测试分析员未保存");

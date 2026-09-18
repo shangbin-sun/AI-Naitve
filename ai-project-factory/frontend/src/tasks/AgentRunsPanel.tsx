@@ -1,3 +1,4 @@
+import { requestId } from "../requestId";
 import TaskScheduleFields, {
   emptySchedule,
   schedulePayload,
@@ -39,6 +40,7 @@ type Artifact = {
   sha256?: string;
 };
 type Node = {
+  submission_id?: string;
   step: {
     key: string;
     owner: string;
@@ -83,6 +85,7 @@ type Run = {
   snapshot: { version: number };
   directory?: string;
   state: {
+    engine?: string;
     nodes: Record<string, Node>;
     reply?: string;
     error?: string;
@@ -429,7 +432,7 @@ export default function AgentRunsPanel({
     };
     const payload = JSON.stringify({ data, automation });
     if (submission.current.payload !== payload)
-      submission.current = { payload, requestId: crypto.randomUUID() };
+      submission.current = { payload, requestId: requestId() };
     let result: Run | undefined;
     if (automation) {
       setBusy(true);
@@ -905,6 +908,7 @@ export default function AgentRunsPanel({
             <div className="task-data-group">
               <ExecutionOutput
                 key={`main-${run.id}`}
+                readOutputs
                 projectId={projectId}
                 runId={run.id}
                 root={run.directory!}
@@ -1150,6 +1154,7 @@ export default function AgentRunsPanel({
             <>
               <ExecutionOutput
                 key={run.id}
+                readOutputs
                 projectId={projectId}
                 runId={run.id}
                 root={run.directory!}
@@ -1187,6 +1192,8 @@ export default function AgentRunsPanel({
           <>
             <ExecutionOutput
               key={`${run.id}-${nodeKey}`}
+              readOutputs
+              nodeKey={nodeKey}
               projectId={projectId}
               runId={run.id}
               root={run.directory!}

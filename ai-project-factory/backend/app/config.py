@@ -28,7 +28,7 @@ class Settings:
             data_dir=data,
             database_url=os.getenv("DATABASE_URL", f"sqlite:///{data / 'factory.db'}"),
             codex_bin=binary or "codex",
-            codex_model=os.getenv("CODEX_MODEL", ""),
+            codex_model=os.getenv("CODEX_MODEL", "").strip() or "gpt-5.6-luna",
             timeout_seconds=int(os.getenv("CODEX_TIMEOUT_SECONDS", "300")),
             codex_reasoning_effort=os.getenv("CODEX_REASONING_EFFORT", "medium"),
             chat_reasoning_effort=os.getenv("CODEX_CHAT_REASONING_EFFORT", os.getenv("CODEX_REASONING_EFFORT", "medium")),

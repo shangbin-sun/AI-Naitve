@@ -74,6 +74,9 @@ class AgentRuns:
         self.tasks = {}
         self.connections = {}
         self.connection_factory = CodexConnection
+        from .independent_runs import IndependentRuns
+        self.independent = IndependentRuns(self)
+        self.engine_mode = 'independent-v1'
 
     def rows(self, db, project, run_id):
         from .service import get_design
@@ -124,7 +127,7 @@ class AgentRuns:
                 db.add(task);db.flush()
             nodes=nodes_for(snapshot,data.scope,data.node,data.save_draft)
             run=AgentRun(id=identity('run'),task_id=task.id,snapshot=snapshot,status='draft' if data.save_draft else 'queued',
-                state={'nodes':nodes,'children':{},'events':[], 'task_inputs':inputs,'request_id':data.request_id,'use_latest':data.use_latest})
+                state={'engine':self.engine_mode,'nodes':nodes,'children':{},'events':[], 'task_inputs':inputs,'request_id':data.request_id,'use_latest':data.use_latest})
             db.add(run);db.flush()
             initialize_files(self,task,run)
             write_json(self.directory(task,run).parent.parent/'manifest.json',{'id':task.id,'scope':task.scope,'title':task.title})
@@ -135,20 +138,31 @@ class AgentRuns:
         if run_id not in self.tasks:
             if len(self.tasks) >= 4:
                 raise HTTPException(429, '最多同时执行4个智能体任务，请稍后重试')
-            self.tasks[run_id] = asyncio.create_task(self.execute(project, run_id, message))
+            with self.sessions() as db:
+                _, run = self.rows(db, project, run_id)
+                independent = run.state.get('engine') == 'independent-v1'
+            self.tasks[run_id] = asyncio.create_task(self.independent.execute(project, run_id) if independent and not message else self.execute(project, run_id, message))
 
     def recover(self):
+        pending_submissions = []
         with self.sessions.begin() as db:
             for run in db.scalars(select(AgentRun)):
                 state = copy.deepcopy(run.state)
                 changed = False
                 for node in state.get('nodes', {}).values():
+                    if node.get('workflow_generation', {}).get('status') in ('queued', 'running'):
+                        node['workflow_generation'].update(status='interrupted', error='服务重启，流程生成已中断，请重新生成')
+                        changed = True
                     if node.get('tuning', {}).get('status') in ('queued', 'running'):
                         node['tuning'].update(status='interrupted', error='服务重启，调优已中断，可继续原会话')
                         changed = True
                 if changed:
                     self.persist(db.get(AgentTask, run.task_id), run, state)
             for run in db.scalars(select(AgentRun).where(AgentRun.status=='awaiting_review')):
+                if run.state.get('engine') == 'independent-v1':
+                    task=db.get(AgentTask,run.task_id)
+                    pending_submissions.append((task.project_id, run.id))
+                    continue
                 if run.state.get('nodes') and all(n['status'] in ('completed','skipped') for n in run.state['nodes'].values()):
                     task=db.get(AgentTask,run.task_id)
                     run.status='completed'
@@ -159,6 +173,16 @@ class AgentRuns:
                 state = copy.deepcopy(run.state)
                 state['error'] = '服务重启；请确认后继续原会话，未自动重新执行。'
                 self.persist(task, run, state)
+
+        for project, run_id in pending_submissions:
+            try:
+                # Reconcile existing outputs only; never execute new model turns on boot.
+                self.independent.advance(project, run_id)
+            except ValueError as exc:
+                def failed(run,state):
+                    run.status='interrupted'
+                    state['error']=str(exc)
+                self.independent.update(project,run_id,failed)
 
     def notification(self, project, run_id, event, replay=False):
         data = event.get('params', {})
@@ -471,6 +495,8 @@ class AgentRuns:
 
 def install_agent_runs(app, manager):
     install_task_center(app,manager)
+    from .independent_runs import install_independent_runs
+    install_independent_runs(app, manager)
     from .run_activity import install_run_activity
     install_run_activity(app, manager)
     from .employee_tuning import install_employee_tuning
@@ -496,7 +522,7 @@ def install_agent_runs(app, manager):
             _, run = manager.rows(db, project, run_id)
             if run_id in manager.tasks or run.status in ('running', 'queued'):
                 raise HTTPException(409, '本轮仍在执行，请等待完成或停止')
-            if not run.thread_id:
+            if not run.thread_id and run.state.get('engine') != 'independent-v1':
                 raise HTTPException(409, '尚未建立运行会话，请先继续运行')
         manager.launch(project, run_id, data.content)
         return {'status':'queued'}
@@ -505,6 +531,41 @@ def install_agent_runs(app, manager):
     def list_runs(project: str):
         with manager.sessions() as db:
             return [manager.describe(task, run) for task, run in db.execute(select(AgentTask, AgentRun).join(AgentRun).where(AgentTask.project_id == project).order_by(AgentRun.created_at.desc()).limit(100))]
+
+    @app.get('/api/workspaces/{project}/agent-runs/{run_id}/outputs')
+    def current_outputs(project: str, run_id: str, node: str | None = None):
+        with manager.sessions() as db:
+            task, run = manager.rows(db, project, run_id)
+            latest = db.scalar(select(AgentRun.id).where(AgentRun.task_id == task.id)
+                .order_by(AgentRun.created_at.desc(), AgentRun.id.desc()).limit(1))
+            nodes = run.state.get('nodes', {})
+            if node is not None and node not in nodes:
+                raise HTTPException(404, '员工节点不存在')
+            chosen = {node: nodes[node]} if node is not None else nodes
+            live = latest == run.id and run.state.get('engine') == 'independent-v1'
+            files, warnings = [], []
+            root = manager.directory(task, run)
+            for key, value in chosen.items():
+                if not live:
+                    files.extend(value.get('artifacts', []))
+                    continue
+                if not value.get('attempt'):
+                    continue
+                try:
+                    directory = safe_path(root, f"nodes/{key}/attempts/{value['attempt']}/outputs")
+                    if not directory.is_dir():
+                        raise ValueError('输出目录不存在')
+                    for entry in sorted(directory.rglob('*')):
+                        checked = safe_path(root, str(entry.relative_to(root)))
+                        if checked.is_file():
+                            stat = checked.stat()
+                            files.append({'path':str(entry.relative_to(root)), 'size':stat.st_size,
+                                'revision':f'{stat.st_mtime_ns}:{stat.st_ctime_ns}:{stat.st_size}'})
+                except (ValueError, OSError) as error:
+                    warnings.append(f'{key}：无法完整读取输出目录（{error}）')
+            summaries = [v.get('summary') for v in chosen.values() if v.get('summary')]
+            return {'files':files, 'source':'current' if live else 'snapshot',
+                'summary':'\n\n'.join(summaries) or run.state.get('reply', ''), 'warnings':warnings}
 
     @app.post('/api/workspaces/{project}/agent-runs', status_code=202)
     async def start(project: str, data: NewAgentTask):
@@ -548,6 +609,10 @@ def install_agent_runs(app, manager):
             state.setdefault('events',[]).append({'at':now(),'tool':'answer','node':data.node,'note':data.answer})
             node['status'] = 'completed' if node['employee']['kind'] == 'human' else (('running' if node.get('thread_id') else 'preparing') if node['attempt'] else 'pending')
             write_json(manager.directory(task, run) / 'handoffs' / (data.node + '-human.json'), {'question': node['question'], 'answer': data.answer, 'at': now()})
+            if state.get('engine') == 'independent-v1' and node['employee']['kind'] == 'human':
+                from .independent_runs import file_record
+                node['artifacts']=[file_record(manager.directory(task,run),'handoffs/'+data.node+'-human.json')]
+                node['acceptance_record']={'at':now(),'actor':'user','approved':True,'note':data.answer}
             manager.persist(task, run, state)
             return manager.describe(task, run)
 

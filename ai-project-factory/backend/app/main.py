@@ -34,6 +34,7 @@ from .task_schedule import TaskScheduler, install_task_schedules
 from .workspace_browser import install_workspace_browser
 from .models import DeletedTeam, Evaluation, now
 from .agent_models import AgentTask, AgentRun
+from .employee_evaluation import EmployeeEvaluations, install_employee_evaluations
 
 
 def record(row):
@@ -71,6 +72,7 @@ def create_app(settings=None, runtime=None):
     workspaces = Workspaces(settings, sessions)
     agent_runs = AgentRuns(sessions, settings, workspaces)
     scheduler = TaskScheduler(agent_runs)
+    employee_evaluations = EmployeeEvaluations(sessions, settings)
     project_tools = ProjectTools(sessions, manager, evidence)
     project_tools.agent_runs = agent_runs
     dashboards = DashboardService(sessions, agent_runs)
@@ -83,9 +85,11 @@ def create_app(settings=None, runtime=None):
         manager.recover()
         evidence.recover()
         agent_runs.recover()
+        employee_evaluations.recover()
         scheduler.start()
         yield
         await scheduler.close()
+        await employee_evaluations.close()
         await manager.shutdown()
         await evidence.shutdown()
         await agent_runs.shutdown()
@@ -100,6 +104,8 @@ def create_app(settings=None, runtime=None):
     app.state.dashboards = dashboards
     install_dashboards(app, dashboards)
     app.state.agent_runs = agent_runs
+    app.state.employee_evaluations = employee_evaluations
+    install_employee_evaluations(app, employee_evaluations)
     install_agent_runs(app, agent_runs)
     install_task_schedules(app, scheduler)
     app.state.task_scheduler = scheduler
@@ -116,7 +122,7 @@ def create_app(settings=None, runtime=None):
     async def local_origin(request: Request, call_next):
         # This first milestone is intentionally a loopback-only personal workspace.
         origin = request.headers.get("origin")
-        if origin and origin not in {"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"}:
+        if origin and origin not in {"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174", "http://localhost:8000", "http://127.0.0.1:8000"}:
             return Response("Origin not allowed", status_code=403)
         return await call_next(request)
 
@@ -360,6 +366,18 @@ def create_app(settings=None, runtime=None):
     async def save_employee(identity: str, data: EditEmployee):
         async with manager.lock:
             with sessions.begin() as db:
+                # The visible workflow and its executable skill must be updated together.
+                current = db.get(Employee, identity)
+                raw = data.files.get('workflow.json')
+                if current and raw is not None and raw != current.files.get('workflow.json'):
+                    from .employee_ability import validate_workflow, workflow_file, saved_workflow
+                    from .workflow_generation import project_workflow
+                    try:
+                        workflow = validate_workflow(json.loads(raw))
+                    except (ValueError, TypeError):
+                        raise HTTPException(422, 'WorkFlow JSON 格式不正确')
+                    workflow = {**workflow, 'version': (saved_workflow(current) or {}).get('version', 0) + 1}
+                    data.files = project_workflow({**data.files, 'workflow.json': workflow_file(workflow)}, workflow)
                 return record(edit_employee(db, identity, data))
 
     @app.get("/api/employees/{identity}/export")

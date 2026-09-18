@@ -1,9 +1,25 @@
 import {expect,it,vi} from "vitest";
-import {render,screen} from "@testing-library/react";
+import {render,screen,waitFor} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ExecutionOutput, { executionSummary, documentSummary } from "../tasks/ExecutionOutput";
 import {api} from "../api";
 vi.mock("../api",()=>({api:vi.fn()}));
+it("当前输出轮询刷新同路径的摘要、大小与已打开预览",async()=>{
+ let revision = "1";
+ vi.mocked(api).mockImplementation(async (url)=>{
+  if (String(url).includes('/outputs')) return {source:"current",warnings:[],summary:`总结${revision}`,files:[{path:"outputs/current.md",size:revision==="1"?100:200,revision}]} as never;
+  return {text:`内容${revision}`} as never;
+ });
+ render(<ExecutionOutput projectId="p" runId="r" root="/run" status="completed" files={[]} readOutputs nodeKey="worker"/>);
+ expect(await screen.findByText("总结1")).toBeVisible();
+ await userEvent.click(await screen.findByRole("button",{name:/current.md/}));
+ await waitFor(()=>expect(screen.getAllByText("内容1").length).toBe(2));
+ revision="2";
+ await waitFor(()=>expect(screen.getByText("总结2")).toBeVisible(),{timeout:4000});
+ await waitFor(()=>expect(screen.getAllByText("内容2").length).toBe(2));
+ expect(screen.getByText("200 B")).toBeVisible();
+ expect(api).toHaveBeenCalledWith('/workspaces/p/agent-runs/r/outputs?node=worker');
+},7000);
 it("输出展示总结、文件用途和预览，打开操作绑定当前文件",async()=>{
  vi.mocked(api).mockResolvedValue({text:"需求内容预览"});
  render(<ExecutionOutput projectId="p" runId="r" root="/Users/test/run" status="completed" summary="已完成需求分解" files={[{path:"nodes/a/outputs/result.md",description:"需求清单与验收标准"}]}/>);

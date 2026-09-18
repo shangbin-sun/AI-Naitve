@@ -1,3 +1,4 @@
+import { requestId } from "../requestId";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -297,7 +298,7 @@ export default function LegacyTasksPanel({
       action,
     ]);
     if (request.current?.signature !== signature)
-      request.current = { signature, id: crypto.randomUUID() };
+      request.current = { signature, id: requestId() };
     try {
       const run = await api<TaskRun>(`${prefix}/${detail.id}/runs`, {
         method: "POST",

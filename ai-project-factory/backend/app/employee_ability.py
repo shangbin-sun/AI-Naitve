@@ -2,6 +2,7 @@
 import base64
 import copy
 import hashlib
+import json
 from pathlib import PurePosixPath
 
 from fastapi import HTTPException
@@ -19,6 +20,75 @@ class AbilityUpdate(BaseModel):
     expected_version: int
     instructions: str = Field(min_length=1, max_length=50000)
     files: dict[str, str]
+    workflow: dict | None = None
+
+
+class WorkflowUpdate(BaseModel):
+    workflow: dict
+    expected_version: int
+    proposal_id: str
+
+
+def validate_workflow(workflow):
+    """Keep the visible workflow small, structured, and safe to persist."""
+    if not isinstance(workflow, dict):
+        raise HTTPException(422, 'WorkFlow 必须是对象')
+    if len(str(workflow)) > 120000:
+        raise HTTPException(422, 'WorkFlow 内容过大')
+    steps = workflow.get('steps')
+    if any(field in workflow for field in ('approach', 'inputs', 'outputs')):
+        from .workflow_generation import ContractItem
+        if not isinstance(workflow.get('approach'), str):
+            raise HTTPException(422, '请填写全局做事思路')
+        for field in ('inputs', 'outputs'):
+            items = workflow.get(field)
+            if not isinstance(items, list) or len(items) > 40:
+                raise HTTPException(422, '输入输出必须为不超过 40 项的条目列表')
+            identities = set()
+            for item in items:
+                try:
+                    parsed = ContractItem.model_validate(item, strict=True)
+                except ValueError:
+                    raise HTTPException(422, '输入输出条目格式不正确')
+                if not parsed.id.strip() or parsed.id in identities or not parsed.name.strip():
+                    raise HTTPException(422, '输入输出条目须有名称和唯一编号')
+                identities.add(parsed.id)
+    for field in ('title', 'goal'):
+        if not isinstance(workflow.get(field), str):
+            raise HTTPException(422, f'WorkFlow 缺少 {field}')
+    if not isinstance(steps, list) or not steps:
+        raise HTTPException(422, 'WorkFlow 至少需要一个步骤')
+    if len(steps) > 40:
+        raise HTTPException(422, 'WorkFlow 步骤不能超过 40 个')
+    ids = set()
+    for step in steps:
+        if not isinstance(step, dict):
+            raise HTTPException(422, 'WorkFlow 步骤格式不正确')
+        step_id = str(step.get('id', '')).strip()
+        if not step_id or step_id in ids:
+            raise HTTPException(422, 'WorkFlow 步骤 ID 必须唯一')
+        ids.add(step_id)
+        for field in ('requirements', 'actions'):
+            if not isinstance(step.get(field), list) or not all(isinstance(x, str) for x in step[field]):
+                raise HTTPException(422, f'WorkFlow {field} 必须是字符串列表')
+        for field in ('input', 'output', 'acceptance'):
+            if not isinstance(step.get(field), str):
+                raise HTTPException(422, f'WorkFlow 缺少 {field}')
+        if 'description' in step and (not isinstance(step['description'], str) or not step['description'].strip()):
+            raise HTTPException(422, 'WorkFlow 动作说明不能为空')
+        for field in (('name',) if 'description' in step else ('name', 'goal')):
+            if not isinstance(step.get(field), str) or not step[field].strip():
+                raise HTTPException(422, f'WorkFlow 步骤缺少 {field}')
+    return workflow
+
+
+def workflow_file(workflow):
+    return json.dumps(workflow, ensure_ascii=False, indent=2) + '\n'
+
+
+def saved_workflow(employee):
+    raw = employee.files.get('workflow.json')
+    return validate_workflow(json.loads(raw)) if raw else None
 
 
 class VerifyEmployee(TaskOptions):
@@ -56,12 +126,24 @@ def install_employee_ability(app, manager, state, idle):
         with manager.sessions() as db:
             _, _, _, node = state(db, project, run_id, key)
             employee = employee_for(db, project, node)
+            stored = saved_workflow(employee)
+            if stored is None and isinstance(employee.files.get('workflow.json'), str):
+                try:
+                    stored = json.loads(employee.files['workflow.json'])
+                except json.JSONDecodeError:
+                    stored = None
             return {'expected_version': employee.version, 'instructions': employee.profile['instructions'],
-                    'files': employee.files, 'proposal': node.get('tuning', {}).get('ability_proposal')}
+                    'files': employee.files, 'workflow': stored,
+                    'proposal': node.get('tuning', {}).get('ability_proposal')}
 
     @app.post(base + '/ability')
     def save(project: str, run_id: str, key: str, body: AbilityUpdate):
         validate_ability_files(body.files)
+        if body.workflow is not None:
+            validate_workflow(body.workflow)
+            body.files['workflow.json'] = workflow_file(body.workflow)
+            from .workflow_generation import project_workflow
+            body.files = project_workflow(body.files, body.workflow)
         with manager.sessions.begin() as db:
             task, run, data, node = state(db, project, run_id, key)
             idle(run)
@@ -69,11 +151,54 @@ def install_employee_ability(app, manager, state, idle):
             before = employee.version
             profile = {**employee.profile, 'instructions': body.instructions}
             employee = edit_employee(db, employee.id, EditEmployee(expected_version=body.expected_version, profile=profile, files=body.files))
-            node.setdefault('tuning', {}).setdefault('ability_updates', []).append({'at': now(), 'from_version': before, 'version': employee.version})
+            tuning = node.setdefault('tuning', {})
+            if body.workflow is not None:
+                tuning['workflow_draft'] = body.workflow
+                if tuning.get('ability_proposal'):
+                    tuning['ability_proposal']['workflow'] = body.workflow
+            tuning.setdefault('ability_updates', []).append({'at': now(), 'from_version': before, 'version': employee.version,
+                                                             'workflow': body.workflow is not None})
             manager.persist(task, run, data)
             version = employee.version
         manager.workspaces.snapshot(project)
         return {'version': version}
+
+    @app.post(base + '/workflow')
+    def save_workflow(project: str, run_id: str, key: str, body: WorkflowUpdate):
+        workflow = validate_workflow(body.workflow)
+        with manager.sessions.begin() as db:
+            task, run, data, node = state(db, project, run_id, key)
+            idle(run)
+            employee = employee_for(db, project, node)
+            tuning = node.setdefault('tuning', {})
+            proposal = tuning.get('ability_proposal')
+            if not proposal or proposal.get('id') != body.proposal_id:
+                raise HTTPException(409, '候选已更新，请刷新后重新比较')
+            if proposal.get('saved_version'):
+                raise HTTPException(409, '候选已经保存')
+            if employee.version != body.expected_version or proposal['expected_version'] != employee.version:
+                raise HTTPException(409, '员工已有新版本，请重新生成候选后比较')
+            validate_ability_files(proposal['files'])
+            before = employee.version
+            workflow = {**workflow, 'version': (saved_workflow(employee) or {}).get('version', 0) + 1}
+            files = {**proposal['files'], 'workflow.json': workflow_file(workflow)}
+            if proposal.get('generated_workflow') or 'approach' in workflow:
+                from .workflow_generation import project_workflow
+                files = project_workflow(files, workflow)
+            validate_ability_files(files)
+            employee = edit_employee(db, employee.id, EditEmployee(
+                expected_version=before,
+                profile={**employee.profile, 'instructions': proposal['instructions']},
+                files=files,
+            ))
+            tuning['workflow_draft'] = workflow
+            proposal.update(workflow=workflow, saved_version=employee.version)
+            tuning.setdefault('ability_updates', []).append({'at': now(), 'from_version': before,
+                                                             'version': employee.version, 'workflow': True})
+            manager.persist(task, run, data)
+            version = employee.version
+        manager.workspaces.snapshot(project)
+        return {'workflow': workflow, 'version': version}
 
     @app.get(base + '/verification-inputs')
     def inputs(project: str, run_id: str, key: str):

@@ -29,6 +29,7 @@ type Props = {
   assistantName?: string;
   readOnly?: boolean;
   liveReply?: string;
+  nativeTimeline?: boolean;
   emptyTitle?: string;
   emptyDescription?: string;
   contextPanel?: ReactNode;
@@ -62,6 +63,9 @@ export function convertMessage(message: ChatMessage): ThreadMessageLike {
     metadata: {
       custom: {
         timing: message.timing,
+        event: message.event,
+        sourceLabel: message.source_label,
+        turnId: message.turn_id,
         employeeReference: message.employee_reference,
       },
     },
@@ -114,6 +118,9 @@ const AssistantName = createContext("✳ AI 团队助手");
 function Message() {
   const assistantName = useContext(AssistantName);
   const role = useAuiState((s) => s.message.role);
+  const event = useAuiState((s) => s.message.metadata.custom?.event) as ChatMessage['event'];
+  const sourceLabel = useAuiState((s) => s.message.metadata.custom?.sourceLabel) as string | undefined;
+  const turnId = useAuiState((s) => s.message.metadata.custom?.turnId) as string | undefined;
   const employeeReference = useAuiState(
     (s) => s.message.metadata.custom?.employeeReference,
   ) as ChatMessage["employee_reference"];
@@ -122,8 +129,12 @@ function Message() {
   ) as ChatMessage["timing"];
   return (
     <MessagePrimitive.Root className={`factory-chat-message ${role}`}>
+      {event ? <details className="chat-execution-event" data-turn-id={turnId}>
+        <summary>{event.title} · {({completed:'已完成',inProgress:'执行中',failed:'失败',interrupted:'已中断'} as Record<string,string>)[event.status] ?? event.status}</summary>
+        <pre style={{whiteSpace:'pre-wrap', overflowWrap:'anywhere'}}>{event.detail}</pre>
+      </details> : <>
       <div className="factory-chat-author">
-        <span>{role === "user" ? "你" : assistantName}</span>
+        <span>{sourceLabel || (role === "user" ? "你" : assistantName)}</span>
         {role === "assistant" && timing && (
           <ProcessingTime
             startedAt={timing.started_at}
@@ -145,6 +156,7 @@ function Message() {
           components={{ Attachment: SavedAttachment }}
         />
       </div>
+      </>}
     </MessagePrimitive.Root>
   );
 }
@@ -239,7 +251,7 @@ export default function ProjectChat(props: Props) {
     lastMessage.content === current.reply;
   // Create the current turn before its first text delta, so its author and
   // timer use the same header throughout waiting, streaming and persistence.
-  const preview = !alreadySaved && (props.busy || Boolean(current?.reply));
+  const preview = !props.nativeTimeline && !alreadySaved && (props.busy || Boolean(current?.reply));
   const messages = preview
     ? [
         ...props.messages,

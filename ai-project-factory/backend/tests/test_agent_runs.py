@@ -20,6 +20,7 @@ from test_factory import DRAFT, ControlledRuntime
 def manager(tmp_path):
     app = create_app(Settings(tmp_path, f'sqlite:///{tmp_path}/db.sqlite', 'unused', '', 5), ControlledRuntime())
     manager = app.state.agent_runs
+    manager.engine_mode = 'legacy'
     manager.app = app
     with manager.sessions.begin() as db:
         project = Design(title='AI 团队')
