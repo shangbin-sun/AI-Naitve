@@ -188,3 +188,28 @@ def test_local_open_only_accepts_verified_output(manager,monkeypatch):
     with TestClient(manager.app) as client:
         base=f'/api/workspaces/{manager.project_id}/agent-runs/{run["id"]}/open-local'
         assert client.post(base,json={'path':'../../private.txt'}).status_code==404
+
+
+def test_local_open_uses_windows_explorer_for_verified_output(manager,monkeypatch):
+    import sys
+    calls=[]
+    class Process:
+        async def wait(self):
+            return 0
+    async def spawn(*args, **kwargs):
+        calls.append(args)
+        return Process()
+    monkeypatch.setattr(sys,'platform','win32')
+    monkeypatch.setattr('asyncio.create_subprocess_exec',spawn)
+    run=create(manager,'node')
+    active(manager,run)
+    begun=control(manager,run,'begin',node='analyze')
+    child(manager,run)
+    output=Path(begun['attempt_path'])/'outputs/result.txt'
+    output.write_text('result', encoding='utf-8')
+    control(manager,run,'finish',node='analyze',thread_id='child',artifacts=['result.txt'])
+    with TestClient(manager.app) as client:
+        base=f'/api/workspaces/{manager.project_id}/agent-runs/{run["id"]}/open-local'
+        path='nodes/analyze/attempts/'+begun['attempt']+'/outputs/result.txt'
+        assert client.post(base,json={'path':path}).status_code==200
+    assert calls and calls[0][0]=='explorer.exe' and calls[0][1].startswith('/select,"')

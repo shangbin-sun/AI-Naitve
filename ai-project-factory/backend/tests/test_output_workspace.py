@@ -1,3 +1,4 @@
+import os
 from types import SimpleNamespace
 from urllib.parse import unquote
 from pathlib import Path
@@ -14,7 +15,10 @@ def test_output_copy_exact_files_and_preserves_edits(tmp_path):
     files = result['files']
     assert len(files) == 5
     entry = next(f for f in files if f['name'] == '../../outside.py')
-    target = Path(unquote(entry['uri'].removeprefix('vscode://file')))
+    uri_path = unquote(entry['uri'].removeprefix('vscode://file'))
+    if os.name == 'nt' and uri_path.startswith('/') and len(uri_path) > 2 and uri_path[2] == ':':
+        uri_path = uri_path[1:]
+    target = Path(uri_path)
     assert target.is_relative_to(tmp_path)
     assert target.read_text() == 'original'
     target.write_text('human edit')

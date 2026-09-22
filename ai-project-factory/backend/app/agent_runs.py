@@ -257,7 +257,7 @@ class AgentRuns:
                             try:
                                 path=safe_path(self.directory(task,run),artifact['path'])
                                 if path.stat().st_size>200000: continue
-                                content=path.read_text()[:remaining]
+                                content=path.read_text(encoding='utf-8')[:remaining]
                             except (UnicodeError,OSError,ValueError): continue
                             previews.append({'path':artifact['path'],'text':content});remaining-=len(content)
                     result['artifact_previews']=previews
@@ -356,7 +356,7 @@ class AgentRuns:
                     path = safe_path(outputs, name)
                     if not path.is_file() or path.stat().st_size > 20_000_000:
                         raise ValueError('输出文件不存在或超过20MB')
-                    artifacts.append({'path': str(path.relative_to(root)), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'size': path.stat().st_size, 'description': str(args.get('file_descriptions',{}).get(name,''))[:500]})
+                    artifacts.append({'path': path.relative_to(root).as_posix(), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'size': path.stat().st_size, 'description': str(args.get('file_descriptions',{}).get(name,''))[:500]})
                 if node.get('error'):
                     node['warnings'] = (node.get('warnings', []) + [{'at': now(), 'note': node['error'], 'resolved': True}])[-50:]
                 node.pop('error', None)
@@ -556,10 +556,10 @@ def install_agent_runs(app, manager):
                     if not directory.is_dir():
                         raise ValueError('输出目录不存在')
                     for entry in sorted(directory.rglob('*')):
-                        checked = safe_path(root, str(entry.relative_to(root)))
+                        checked = safe_path(root, entry.relative_to(root).as_posix())
                         if checked.is_file():
                             stat = checked.stat()
-                            files.append({'path':str(entry.relative_to(root)), 'size':stat.st_size,
+                            files.append({'path':entry.relative_to(root).as_posix(), 'size':stat.st_size,
                                 'revision':f'{stat.st_mtime_ns}:{stat.st_ctime_ns}:{stat.st_size}'})
                 except (ValueError, OSError) as error:
                     warnings.append(f'{key}：无法完整读取输出目录（{error}）')
@@ -634,8 +634,16 @@ def install_agent_runs(app, manager):
     @app.post('/api/workspaces/{project}/agent-runs/{run_id}/open-local')
     async def open_local(project: str,run_id: str,data: LocalOutput):
         import sys
-        if sys.platform!='darwin': raise HTTPException(409,'本地打开仅支持 Mac 服务端')
         response=artifact(project,run_id,data.path)
-        process=await asyncio.create_subprocess_exec('open','-R',str(response.path),stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
-        if await process.wait()!=0: raise HTTPException(409,'无法在本地打开文件')
+        if sys.platform == 'darwin':
+            process=await asyncio.create_subprocess_exec('open','-R',str(response.path),stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
+            if await process.wait()!=0: raise HTTPException(409,'无法在本地打开文件')
+        elif sys.platform == 'win32':
+            # Explorer accepts /select,"path" and opens the containing folder.
+            try:
+                await asyncio.create_subprocess_exec('explorer.exe', f'/select,"{response.path}"', stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+            except OSError as exc:
+                raise HTTPException(409,'无法在本地打开文件') from exc
+        else:
+            raise HTTPException(409,'本地打开仅支持 Mac 或 Windows 服务端')
         return {'opened':True}

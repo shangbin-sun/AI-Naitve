@@ -7,7 +7,6 @@ import json
 import os
 import re
 import shutil
-import signal
 from pathlib import Path
 from typing import Literal
 
@@ -20,6 +19,7 @@ from .service import get_design
 from .schemas import Strict
 from .employee_builder import build_employee, run_employee
 from .delivery import delivery
+from .process_utils import subprocess_group_kwargs, terminate_process
 
 
 def record(row):
@@ -148,15 +148,16 @@ class EvidenceManager:
         total = 0
         for file in sorted(root.rglob('*')):
             relative = file.relative_to(root)
+            name = relative.as_posix()
             if file.is_symlink() or any(p in ignored or p.startswith('.') for p in relative.parts): continue
             if not file.is_file() or not file.resolve().is_relative_to(root): continue
-            resource = '/resources/' in '/'+relative.as_posix() and file.suffix in {'.yaml','.yml','.json','.xml','.properties','.csv','.txt'}
+            resource = '/resources/' in '/'+name and file.suffix in {'.yaml','.yml','.json','.xml','.properties','.csv','.txt'}
             if file.suffix not in extensions and not resource and file.name not in {'gradlew', 'gradle-wrapper.jar', 'gradle-wrapper.properties','gradle.properties'}: continue
             if file.stat().st_size > 500000: continue
             data = file.read_bytes()
             total += len(data)
             if total > 12000000 or len(files) >= 1200: raise HTTPException(422, '代码基线超过12MB或1200文件限制')
-            files[str(relative)] = data
+            files[name] = data
         if not files: raise HTTPException(422, '目录中没有可导入的源文件')
         sid = uid()
         dest = self.root / sid
@@ -239,7 +240,7 @@ class EvidenceManager:
                     if kind == 'requirements':
                         manifest = artifact_manifest(row)
                         row.result = {**result, 'manifest':manifest}
-                        (self.settings.data_dir/'analyses'/identity/'run-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
+                        (self.settings.data_dir/'analyses'/identity/'run-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2), encoding='utf-8')
                 if kind == 'delivery' and result.get('plan') and not inputs.get('task_id'):
                     try: self.materialize_delivery_workers(identity)
                     except HTTPException as e:
@@ -273,18 +274,30 @@ class EvidenceManager:
         wrapper.write_bytes(normalized)
         preparation = {'gradlew_crlf_normalized': original != normalized, 'original_sha256': hashlib.sha256(original).hexdigest(), 'execution_sha256': hashlib.sha256(normalized).hexdigest()}
         properties = dest / 'gradle/wrapper/gradle-wrapper.properties'
-        version = re.search(r'distributions/(gradle-[0-9.]+-(?:bin|all))\.zip', properties.read_text()) if properties.exists() else None
+        version = re.search(r'distributions/(gradle-[0-9.]+-(?:bin|all))\.zip', properties.read_text(encoding='utf-8')) if properties.exists() else None
         if version:
             cached = Path.home() / '.gradle/wrapper/dists' / version.group(1)
             if cached.is_dir() and not (dest / '.gradle-home/wrapper/dists' / version.group(1)).exists():
                 shutil.copytree(cached, dest / '.gradle-home/wrapper/dists' / version.group(1), ignore=shutil.ignore_patterns('*.lck','*.part'))
                 preparation['distribution_cache'] = str(cached)
-        command = ['bash', 'gradlew', 'test', '--no-daemon', '--console=plain']
+        if os.name == 'nt':
+            if (dest / 'gradlew.bat').is_file():
+                command = ['gradlew.bat', 'test', '--no-daemon', '--console=plain']
+            elif shutil.which('gradle'):
+                command = ['gradle', 'test', '--no-daemon', '--console=plain']
+            elif shutil.which('sh'):
+                # A POSIX wrapper can run through an installed native shell
+                # such as Scoop's sh.exe; WSL is never required.
+                command = ['sh', 'gradlew', 'test', '--no-daemon', '--console=plain']
+            else:
+                command = ['gradle', 'test', '--no-daemon', '--console=plain']
+        else:
+            command = ['bash', 'gradlew', 'test', '--no-daemon', '--console=plain']
         if inputs.get('offline', True): command.append('--offline')
         if inputs.get('java_homes'):command.append('-Porg.gradle.java.installations.paths='+','.join(inputs['java_homes']))
         env = {**os.environ, 'GRADLE_USER_HOME': str(dest / '.gradle-home')}
         with (dest/'baseline.log').open('wb') as log:
-            proc = await asyncio.create_subprocess_exec(*command, cwd=dest, env=env, stdout=log, stderr=asyncio.subprocess.STDOUT, start_new_session=True)
+            proc = await asyncio.create_subprocess_exec(*command, cwd=dest, env=env, stdout=log, stderr=asyncio.subprocess.STDOUT, **subprocess_group_kwargs())
             try:
                 await asyncio.wait_for(proc.wait(), inputs.get('timeout_seconds',120))
                 code = proc.returncode
@@ -293,13 +306,7 @@ class EvidenceManager:
                 preparation['timeout_seconds'] = inputs.get('timeout_seconds',120)
             finally:
                 if proc.returncode is None:
-                    try:
-                        os.killpg(proc.pid, signal.SIGTERM)
-                        await asyncio.wait_for(proc.wait(), 3)
-                    except (ProcessLookupError, asyncio.TimeoutError):
-                        try: os.killpg(proc.pid, signal.SIGKILL)
-                        except ProcessLookupError: pass
-                        await proc.wait()
+                    await terminate_process(proc)
         with (dest/'baseline.log').open('rb') as log:
             log.seek(max(0, log.seek(0, 2)-20000))
             output = log.read()
@@ -320,7 +327,7 @@ def install_evidence(app, manager):
             row.result = {**row.result, 'manifest':manifest}
             dest = manager.settings.data_dir/'analyses'/identity
             dest.mkdir(parents=True,exist_ok=True)
-            (dest/'run-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
+            (dest/'run-manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2), encoding='utf-8')
             return record(row)
 
     @app.post('/api/evaluations/{identity}/cancel')

@@ -291,7 +291,7 @@ class EmployeeEvaluations:
             '执行 inputs/task.json 描述的任务，读取输入文件，将成果写到 outputs。', directory,
             {**data['config'], 'mode':'files'})
         verify_snapshot(directory/'inputs', case['input_files'])
-        if json.loads((directory/'inputs/task.json').read_text()) != json.loads(case['input_text']):
+        if json.loads((directory/'inputs/task.json').read_text(encoding='utf-8')) != json.loads(case['input_text']):
             raise ValueError('评测输入被修改')
         actual_files = [describe_file(directory/'outputs', str(p.relative_to(directory/'outputs')), str(p.relative_to(directory/'outputs')))
             for p in sorted((directory/'outputs').rglob('*')) if p.is_file() or p.is_symlink()]

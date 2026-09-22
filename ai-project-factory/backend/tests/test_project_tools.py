@@ -1,4 +1,5 @@
 import copy
+import sys
 import time
 import pytest
 from fastapi.testclient import TestClient
@@ -51,6 +52,7 @@ def test_scope_versions_idempotency_and_sync(tools_workspace):
     assert call('get_project_overview').status_code == 409
 
 
+@pytest.mark.skipif(sys.platform == 'win32', reason='employee evaluation requires macOS sandbox-exec')
 def test_actual_evaluation_and_comparison(tools_workspace):
     client, app, project, employee, call, _ = tools_workspace
     assert call('evaluate_employee', employee_id=employee['id'], expected_version=employee['version'], input_json='{}', request_id='missing').status_code == 422

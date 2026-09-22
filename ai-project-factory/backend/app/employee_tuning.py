@@ -67,7 +67,7 @@ def checked_report(root, tuning, thread):
     path = safe_path(root, tuning['attempt'] + '/repair-report.json')
     if not path.is_file() or path.stat().st_size > 50000:
         return {'passed': False, 'verification': '尚未提交修复验证报告'}
-    report = json.loads(path.read_text())
+    report = json.loads(path.read_text(encoding='utf-8'))
     if report.get('passed') is not True or not report.get('verification'):
         return {'passed': False, 'verification': str(report.get('verification') or '验证未通过')[:4000]}
     names = report.get('artifacts', [])

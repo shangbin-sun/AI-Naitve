@@ -2,10 +2,10 @@ import asyncio
 import base64
 import json
 import os
-import signal
 import tempfile
 from pathlib import Path
 
+from .process_utils import subprocess_group_kwargs, terminate_process
 
 
 SYSTEM = """你是 AI AI 团队工厂的团队设计助手。通过中文对话帮助用户设计适用于任意领域的团队。
@@ -110,7 +110,8 @@ class CodexRuntime:
                     args += ["--image", str(path)]
             args += ["-"]
             proc = await asyncio.create_subprocess_exec(*args, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-                                                        stderr=asyncio.subprocess.PIPE, start_new_session=True, limit=2_000_000)
+                                                        stderr=asyncio.subprocess.PIPE, limit=2_000_000,
+                                                        **subprocess_group_kwargs())
             usage = {}
             stderr_tail = bytearray()
 
@@ -148,19 +149,11 @@ class CodexRuntime:
                     raise RuntimeError(f"Codex 执行失败（退出码 {proc.returncode}），请检查 CLI 登录、网络和账户额度后重试")
                 if not output.exists():
                     raise RuntimeError("Codex 未返回结构化结果，请重试")
-                result = response_model.model_validate_json(output.read_text())
+                result = response_model.model_validate_json(output.read_text(encoding='utf-8'))
                 return result, usage
             except asyncio.TimeoutError:
                 raise RuntimeError("Codex 调用超时，运行已停止；可以缩小任务范围后重试")
             finally:
                 if proc.returncode is None:
-                    try:
-                        os.killpg(proc.pid, signal.SIGTERM)
-                        await asyncio.wait_for(proc.wait(), 3)
-                    except (ProcessLookupError, asyncio.TimeoutError):
-                        try:
-                            os.killpg(proc.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-                        await proc.wait()
+                    await terminate_process(proc)
                 await errors

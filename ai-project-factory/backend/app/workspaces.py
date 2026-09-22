@@ -44,7 +44,7 @@ def write_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(dir=path.parent, prefix='.write-')
     try:
-        with os.fdopen(fd, 'w') as stream:
+        with os.fdopen(fd, 'w', encoding='utf-8') as stream:
             json.dump(data, stream, ensure_ascii=False, indent=2)
         os.replace(name, path)
     finally:
@@ -128,7 +128,7 @@ class Workspaces:
                 projected.update({f'employees/{key}/{name}': content for name, content in employee['files'].items()})
                 projected[f'employees/{key}/instructions.md'] = employee['profile']['instructions']
             index = self.project(project) / 'management/projected-files.json'
-            previous = json.loads(index.read_text()) if index.exists() else []
+            previous = json.loads(index.read_text(encoding='utf-8')) if index.exists() else []
             for name in set(previous) - set(projected):
                 path = safe_path(self.project(project), name)
                 if path.is_file():

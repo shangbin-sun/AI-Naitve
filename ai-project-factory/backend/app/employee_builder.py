@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 import re
-import signal
 import shutil
 import sys
 from pathlib import Path
@@ -20,6 +19,7 @@ from sqlalchemy import select
 from .models import Evaluation, Employee
 from .schemas import Strict
 from .service import apply_draft, get_design, validate_files
+from .process_utils import subprocess_group_kwargs, terminate_process
 
 
 class Sample(Strict):
@@ -64,9 +64,9 @@ async def run_employee(manager, identity, inputs):
     for name,content in inputs['files'].items():
         path=workspace/name
         path.parent.mkdir(parents=True,exist_ok=True)
-        path.write_text(content)
+        path.write_text(content, encoding='utf-8')
     if inputs.get('instruction_bundle'):
-        (workspace/'loaded-capability.json').write_text(json.dumps(inputs['instruction_bundle'], ensure_ascii=False, indent=2))
+        (workspace/'loaded-capability.json').write_text(json.dumps(inputs['instruction_bundle'], ensure_ascii=False, indent=2), encoding='utf-8')
     run=await execute(workspace,['employee.py'],inputs['input_json'],read_root=inputs.get('team_read_root'))
     actual=json.loads(run['stdout']) if run['exit_code']==0 else None
     expected = inputs.get('expected_json')
@@ -122,7 +122,8 @@ def sandbox_command(workspace, args, read_root=None):
 async def execute(workspace, args, input_text='', timeout=20, read_root=None):
     env = {'PATH':'/usr/bin:/bin','HOME':str(workspace),**runtime_environment(workspace), 'LANG':'en_US.UTF-8', 'PYTHONDONTWRITEBYTECODE':'1'}
     proc = await asyncio.create_subprocess_exec(*sandbox_command(workspace,args,read_root),cwd=workspace,env=env,
-        stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,start_new_session=True)
+        stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,
+        **subprocess_group_kwargs())
     async def bounded_read(stream):
         data=bytearray()
         while chunk:=await stream.read(8192):
@@ -138,9 +139,7 @@ async def execute(workspace, args, input_text='', timeout=20, read_root=None):
         return {'exit_code':proc.returncode,'stdout':out.decode(errors='replace'),'stderr':err.decode(errors='replace')}
     finally:
         # Kill remaining process-group children even if the parent has exited.
-        try: os.killpg(proc.pid,signal.SIGKILL)
-        except ProcessLookupError: pass
-        await proc.wait()
+        await terminate_process(proc)
 
 
 async def verify_files(root, files, samples, split):
@@ -148,7 +147,7 @@ async def verify_files(root, files, samples, split):
     for n,case in enumerate(c for c in samples if c['split']==split):
         workspace=root/f'{split}-{n}';workspace.mkdir(parents=True)
         for name,content in files.items():
-            target=workspace/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_text(content)
+            target=workspace/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_text(content, encoding='utf-8')
         try:
             run=await execute(workspace,['employee.py'],case['input_json'])
             actual=json.loads(run['stdout']) if run['exit_code']==0 else None
@@ -186,7 +185,7 @@ async def build_employee(manager, identity, inputs):
         attempt_root=root/f'attempt-{attempt}';attempt_root.mkdir()
         artifact_dir=attempt_root/'package';artifact_dir.mkdir()
         for name,content in files.items():
-            path=artifact_dir/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content)
+            path=artifact_dir/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content, encoding='utf-8')
         unit_dir=attempt_root/'unit'
         shutil.copytree(artifact_dir,unit_dir)
         result['stage']='test';await log(f'第{attempt}轮：运行员工单元测试与开发样例')

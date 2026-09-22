@@ -1,9 +1,19 @@
 """Materialize editable output copies for desktop VS Code, without changing run evidence."""
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 from .process_archive import archive_process, employee_key
+
+
+def vscode_uri(path):
+    """Return a VS Code file URI for either POSIX or Windows paths."""
+    resolved = Path(path).resolve()
+    if os.name == 'nt':
+        encoded = quote(resolved.as_posix(), safe='/:')
+        return 'vscode://file' + (encoded if encoded.startswith('/') else '/' + encoded)
+    return 'vscode://file' + quote(str(resolved), safe='/')
 
 
 def prepare_outputs(root: Path, run):
@@ -41,7 +51,7 @@ def prepare_outputs(root: Path, run):
         manifest.append({'step_id': f'{run.id}-{step}', 'name': name,
                          'original_sha256': hashlib.sha256(content.encode()).hexdigest(),
                          'path': str(target), 'folder': str(employee),
-                         'uri': 'vscode://file' + quote(str(target), safe='/')})
+                         'uri': vscode_uri(target)})
     result, inputs = run.result or {}, run.inputs or {}
     if result.get('plan') and (not inputs.get('previous_plan') or result.get('planning_usage')):
         emit('analysis', '需求与架构方案', json.dumps(result['plan'], ensure_ascii=False, indent=2))
@@ -58,7 +68,7 @@ def prepare_outputs(root: Path, run):
         for file in result.get('artifacts', []):
             emit('pending-code', file['path'], file.get('content'))
     directory_files = []
-    managed = set(json.loads((destination / "shared/archive-index.json").read_text()))
+    managed = set(json.loads((destination / "shared/archive-index.json").read_text(encoding='utf-8')))
     originals = {f["path"]:f["original_sha256"] for f in manifest}
     for folder in sorted((destination / 'employees').iterdir()):
         if not folder.is_dir() or folder.is_symlink(): continue
@@ -66,4 +76,4 @@ def prepare_outputs(root: Path, run):
             if not path.is_file() or path.is_symlink() or not path.resolve().is_relative_to(folder.resolve()) or path.name.endswith('.tmp'): continue
             relative = path.relative_to(folder).as_posix()
             directory_files.append({'employee_key':folder.name, 'relative_path':relative, 'path':str(path), 'folder':str(folder), 'size':path.stat().st_size, 'sha256':hashlib.sha256(path.read_bytes()).hexdigest(), 'kind':'editable_copy' if str(path) in originals else 'run_archive' if path.relative_to(destination).as_posix() in managed else 'workspace_file', 'modified':str(path) in originals and hashlib.sha256(path.read_bytes()).hexdigest()!=originals[str(path)]})
-    return {'directory_files': directory_files, 'folder_uri': 'vscode://file' + quote(str(destination), safe='/'), 'files': manifest}
+    return {'directory_files': directory_files, 'folder_uri': vscode_uri(destination), 'files': manifest}

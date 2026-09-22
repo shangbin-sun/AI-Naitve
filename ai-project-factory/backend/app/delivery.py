@@ -68,7 +68,7 @@ def test_results(root):
             cases.append({'suite':case.get('classname',''),'name':case.get('name',''),'status':state,'seconds':case.get('time',''),'report':p.relative_to(root).as_posix(),'difference':problem.get('message','')[:2000] if problem is not None else ''})
     expected=set()
     for source in root.glob('**/src/test/**/*.java'):
-        content=source.read_text(errors='replace')
+        content=source.read_text(encoding='utf-8', errors='replace')
         package=re.search(r'package\s+([\w.]+)\s*;',content)
         if package and re.search(r'@(Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b',content):expected.add(package.group(1)+'.'+source.stem)
     missing=sorted(expected-{c['suite'].split('$')[0] for c in cases})
@@ -82,7 +82,7 @@ def code_context(root):
     for p in paths:
         name=p.relative_to(root).as_posix()
         if any(part in {'.gradle-home','build','.gradle'} for part in p.relative_to(root).parts):continue
-        text=p.read_text(errors='replace')
+        text=p.read_text(encoding='utf-8', errors='replace')
         if len(text)>budget:continue
         files[name]=text;budget-=len(text)
     return {'files':files,'scope':'按构建配置、测试、源码优先读取，上限150000字符；未包含全部代码'}
@@ -97,7 +97,7 @@ def apply_patch_files(root, files, frozen):
         path=root/name
         if not path.resolve().is_relative_to(root.resolve()) or path.is_symlink():raise ValueError('非法补丁路径')
     for name,content in files.items():
-        path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content)
+        path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(content, encoding='utf-8')
     if test_manifest(root)!=frozen:raise ValueError('参考测试发生变化，拒绝验收')
 
 
@@ -182,7 +182,7 @@ async def delivery(manager, identity, inputs):
         plan,usage=await invoke('it_analysis',0,{'goal':inputs['goal'],'sources':inputs['sources'],
             'run_manifest':{'run_id':identity,'project':inputs.get('project',{}),'code_source_id':inputs['code_source_id'],'reference_test_files':len(frozen),'wrapper_present':(current/'gradlew').is_file(),'toolchains':result.get('toolchains',[])},'code':code_context(current),'employees':inputs.get('employees',[]),'failure':baseline['output']},DeliveryPlan,PLAN)
         result['plan']=plan.model_dump();result['planning_usage']=usage
-    (root/'plan.json').write_text(json.dumps(result['plan'],ensure_ascii=False,indent=2))
+    (root/'plan.json').write_text(json.dumps(result['plan'],ensure_ascii=False,indent=2), encoding='utf-8')
     feedback=baseline
     for attempt in range(1,inputs['max_attempts']+1):
         result['stage']='develop';await log(f'第{attempt}轮：平台开发员工根据实际失败生成修复')
@@ -206,7 +206,7 @@ async def delivery(manager, identity, inputs):
             result['attempts'].append({'attempt':attempt,'error':str(e),'usage':usage});save();continue
         result['last_changes']=files
         result['artifacts']=[{'path':name,'content':value,'sha256':hashlib.sha256(value.encode()).hexdigest()} for name,value in files.items()]
-        (root/f'changes-{attempt}.json').write_text(json.dumps({'summary':package.summary,'files':files},ensure_ascii=False,indent=2))
+        (root/f'changes-{attempt}.json').write_text(json.dumps({'summary':package.summary,'files':files},ensure_ascii=False,indent=2), encoding='utf-8')
         result['stage']='test';await log(f'第{attempt}轮：隔离副本应用修复，运行未修改的原有测试')
         run=await manager.baseline(identity,{**inputs,'timeout_seconds':300},prepared=next_root)
         checked=test_results(next_root)

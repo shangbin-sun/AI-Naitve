@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Drawer, Empty, Table } from "antd";
 import { CodeOutlined, FileTextOutlined } from "@ant-design/icons";
 import { api } from "../api";
+import { toVsCodeFileUri } from "../vscodeUri";
 export type OutputFile = { path: string; description?: string; size?: number; revision?: string; sha256?: string };
 export function cleanOutputText(text: string, root: string) {
   return text
@@ -169,10 +170,10 @@ export default function ExecutionOutput({
             : "执行尚未结束，已提交的产物会显示在这里。";
   const folder = editorRoot === undefined ? root : editorRoot;
   const folderUri = folder
-    ? `vscode://file${folder.split("/").map(encodeURIComponent).join("/")}`
+    ? toVsCodeFileUri(folder)
     : undefined;
   const uri = (file?: string) =>
-    `vscode://file${`${root}${file ? "/" + file : ""}`.split("/").map(encodeURIComponent).join("/")}`;
+    toVsCodeFileUri(`${root}${file ? "/" + file : ""}`);
   const description = (f: OutputFile) =>
     f.description || summaries[f.path] || "正在读取文档摘要…";
   const size = (bytes?: number) =>
@@ -190,7 +191,7 @@ export default function ExecutionOutput({
         body: JSON.stringify({ path: file }),
       });
     } catch {
-      setProblem("本地打开失败，请检查服务是否运行在这台 Mac 上");
+      setProblem("本地打开失败，请检查服务是否运行在本机上");
     } finally {
       setOpening(undefined);
     }

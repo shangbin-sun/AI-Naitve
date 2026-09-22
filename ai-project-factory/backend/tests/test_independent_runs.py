@@ -109,7 +109,7 @@ def test_dependencies_handoff_isolation_and_automatic_completion(manager):
         if method=='thread/start':
             assert params['config']['features']['multi_agent'] is False
             assert params['config']['sandbox_workspace_write']['writable_roots']==[params['cwd']]
-            assert '/nodes/' in params['cwd']
+            assert 'nodes' in Path(params['cwd']).parts
     approve(manager,run,'second');execute(manager,run)
     manager.recover()
     with manager.sessions() as db: assert db.get(AgentRun,run['id']).status=='completed'
@@ -227,10 +227,9 @@ def test_active_or_uncertain_turn_never_resends(manager):
 
 
 def test_same_run_execution_lock_and_submission_version_guard(manager):
-    import fcntl
+    from app.process_lock import NonBlockingFileLock
     run,calls=setup(manager)
-    with (Path(run['directory'])/'scheduler.lock').open('a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    with NonBlockingFileLock(Path(run['directory'])/'scheduler.lock'):
         execute(manager,run)
         assert not calls
     execute(manager,run)

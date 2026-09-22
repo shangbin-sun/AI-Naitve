@@ -5,7 +5,6 @@ Workers can submit artifacts, never approve them or advance the graph themselves
 import asyncio
 import base64
 import copy
-import fcntl
 import hashlib
 import json
 import shutil
@@ -17,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from .employee_context import employee_context
 from .models import now
+from .process_lock import NonBlockingFileLock
 from .runtime_environment import runtime_environment, runtime_config
 from .task_center import public_inputs
 from .workspaces import safe_path, write_json, identity
@@ -384,8 +384,8 @@ class IndependentRuns:
             with self.manager.sessions() as db:
                 task, run = self.manager.rows(db, project, run_id)
                 root = self.manager.directory(task, run)
-            lock = (root/'scheduler.lock').open('a')
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock = NonBlockingFileLock(root/'scheduler.lock')
+            lock.acquire()
             if key:
                 await self.worker(project, run_id, key, message, read_only)
                 if read_only:

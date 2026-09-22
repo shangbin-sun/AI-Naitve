@@ -32,7 +32,59 @@ AI 团队定义与任务数据分开存储：`.data/projects/<project_id>/defini
 
 ## 启动
 
-需要 Python 3.11+、Node.js 20.19+（或 22.12+）、已安装并登录的 Codex CLI。
+### Windows（PowerShell，不使用 WSL）
+
+Windows 本地部署使用 `uv` 管理 Python 环境，使用 nvm-windows 管理 Node.js。推荐 Windows 10/11、PowerShell 5.1 或更高版本。项目当前的前端依赖要求 Node.js 20.19+，或 22.13+。
+
+先安装 Scoop、uv 和 nvm-windows。uv 可以通过 Scoop 安装；nvm-windows 使用其官方安装器，安装完成后重新打开 PowerShell：
+
+```powershell
+# 如果还没有 Scoop：
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm get.scoop.sh | iex
+
+scoop install main/uv
+
+# nvm-windows 安装完成后：
+nvm install 22.13.0
+nvm use 22.13.0
+```
+
+参考：[uv 的 Windows 安装说明](https://docs.astral.sh/uv/getting-started/installation/)、[nvm-windows releases](https://github.com/coreybutler/nvm-windows/releases)。项目对话和任务运行还需要已安装并登录的 Codex CLI；Node.js 已由 nvm 切换后，可以执行 `npm install --global @openai/codex`，然后执行 `codex login`。参考 [Codex CLI 文档](https://developers.openai.com/codex/cli/)。
+
+在仓库根目录执行安装脚本。脚本会用 uv 安装 Python 3.12、创建 `backend\.venv`，安装后端依赖，并在 `frontend` 中执行 `npm ci`；如果找不到 uv 且已安装 Scoop，脚本会尝试执行 `scoop install main/uv`：
+
+```powershell
+cd ai-project-factory
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\scripts\setup_win.ps1
+```
+
+脚本默认使用 uv 管理的 Python 3.12；项目要求 Python 3.11 或更高版本。如果要使用其他由 uv 管理的兼容版本，可以传入版本参数，例如 `.\scripts\setup_win.ps1 -PythonVersion 3.14`。
+
+Windows 安装和启动脚本会在运行 Python 前设置 `PYTHONUTF8=1`，用于保证中文路径和文件内容使用 UTF-8。
+
+配置通过当前 PowerShell 会话的环境变量传入，应用不会自动读取 `.env` 文件。默认使用 SQLite，数据库会写入 `.data\factory.db`；需要调整时可在启动前设置：
+
+```powershell
+$env:CODEX_BIN = 'codex'                         # 也可以填写 codex.exe 的绝对路径
+$env:CODEX_MODEL = 'gpt-5.6-luna'
+$env:FACTORY_DATA_DIR = (Join-Path (Get-Location) '.data')
+$env:FACTORY_SOURCE_ROOT = 'C:\path\to\source-root'
+$env:DATABASE_URL = 'sqlite:///C:/path/to/factory.db'  # 可选；默认使用上面的 FACTORY_DATA_DIR
+```
+
+安装完成后启动两个本地服务：
+
+```powershell
+.\scripts\dev_win.ps1
+```
+
+打开 http://127.0.0.1:5173，接口文档在 http://127.0.0.1:8000/docs。按 Ctrl+C 会停止后端、前端及其子进程。VS Code 是可选的本地编辑器；Windows 部署不需要 code-server。Mac 专用的 Swift 飞书桌面集成不属于 Windows 运行环境。员工 Python 代码评估功能依赖 macOS 的 `sandbox-exec`，当前仅 macOS 可用；Windows 不会无隔离执行员工代码。本地平台和聊天功能仍可运行。
+
+### Linux/macOS
+
+需要 Python 3.11+、Node.js 20.19+（或 22.13+）、已安装并登录的 Codex CLI。
 
 ```bash
 cd ai-project-factory

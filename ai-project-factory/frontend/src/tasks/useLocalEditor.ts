@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { OutputStep } from "./buildOutputChain";
+import { isAbsoluteLocalPath, toVsCodeFileUri } from "../vscodeUri";
 
 type FileEntry = { step_id?: string; name?: string; folder: string; path: string; relative_path?: string };
 export function useLocalEditor(base?: string) {
@@ -24,8 +25,8 @@ export function useLocalEditor(base?: string) {
       }
       if (!matches.length) throw new Error("该环节未保存可编辑文件");
       const path = filename !== undefined || relativePath !== undefined ? matches[0].path : matches[0].folder;
-      if (!path?.startsWith("/")) throw new Error("工作目录无效");
-      const target = `vscode://file${path.split("/").map(encodeURIComponent).join("/")}`;
+      if (!path || !isAbsoluteLocalPath(path)) throw new Error("工作目录无效");
+      const target = toVsCodeFileUri(path);
       setUrl(target);
       window.location.assign(target);
     } catch (e) {

@@ -9,6 +9,7 @@ import {
   CopyOutlined,
 } from "@ant-design/icons";
 import { api } from "./api";
+import { toVsCodeFileUri } from "./vscodeUri";
 import "./workspace-browser.css";
 
 type Entry = { name: string; path: string; directory: boolean };
@@ -136,7 +137,7 @@ export default function WorkspaceBrowser({
             icon={<CodeOutlined />}
             aria-label="用 VS Code 打开"
             disabled={busy}
-            href={`vscode://file${data.root.split("/").map(encodeURIComponent).join("/")}`}
+            href={toVsCodeFileUri(data.root)}
             title="在本机 VS Code 中打开当前工作空间"
           >
             用 VS Code 打开

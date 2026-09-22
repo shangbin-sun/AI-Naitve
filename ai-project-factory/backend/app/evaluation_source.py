@@ -96,7 +96,7 @@ def extract_source(manager, task, run, node_key):
         output_root = safe_path(root, f'nodes/{node_key}/attempts/{attempt}/outputs')
         if not output_root.is_dir():
             raise ValueError('输出目录不存在')
-        output = [file_record(str(p.relative_to(root)), str(p.relative_to(output_root)))
+        output = [file_record(p.relative_to(root).as_posix(), p.relative_to(output_root).as_posix())
                   for p in sorted(output_root.rglob('*')) if p.is_file() or p.is_symlink()]
     except (ValueError, OSError) as exc:
         raise HTTPException(422, str(exc)) from exc

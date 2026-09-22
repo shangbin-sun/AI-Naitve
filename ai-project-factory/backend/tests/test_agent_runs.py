@@ -53,7 +53,7 @@ def test_frozen_definition_and_matching_layout(manager):
     one = create(manager, 'node')
     two = create(manager, 'workflow', 'two')
     assert set(p.name for p in Path(one['directory']).iterdir()) == set(p.name for p in Path(two['directory']).iterdir())
-    assert '/node-tasks/' in one['directory'] and '/workflow-tasks/' in two['directory']
+    assert 'node-tasks' in Path(one['directory']).parts and 'workflow-tasks' in Path(two['directory']).parts
     assert one['snapshot']['digest'] == two['snapshot']['digest']
     with manager.sessions.begin() as db:
         employee = db.query(Employee).first()

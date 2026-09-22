@@ -23,3 +23,16 @@ it("不允许从其他员工目录选择文件", async () => {
   expect(result.current.url).toBe("");
   expect(result.current.error).toBe("该环节未保存可编辑文件");
 });
+
+it("支持 Windows 工作目录唤起本机 VS Code", async () => {
+  const assign = vi.fn();
+  const original = window;
+  vi.stubGlobal("window", new Proxy(original, { get(target, key) { return key === "location" ? { assign } : Reflect.get(target, key); } }));
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ files: [{ step_id: "s", name: "main.py", folder: String.raw`C:\work\run`, path: String.raw`C:\work\run\main.py` }] }),
+  }));
+  const { result } = renderHook(() => useLocalEditor("/api/runs"));
+  await act(() => result.current.open(step, "main.py"));
+  expect(assign).toHaveBeenCalledWith("vscode://file/C:/work/run/main.py");
+});

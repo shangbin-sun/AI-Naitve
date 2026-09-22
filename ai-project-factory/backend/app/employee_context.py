@@ -48,7 +48,7 @@ def employee_context(snapshot, key):
 def employee_context_from_db(db, employee):
     """Freeze legacy entry points at creation time too, using the same loader."""
     from .organization import ensure_project_instructions
-    definition = {'organization_instructions': (Path(__file__).parent / 'instructions/organization.md').read_text(),
+    definition = {'organization_instructions': (Path(__file__).parent / 'instructions/organization.md').read_text(encoding='utf-8'),
                   'project_files': dict(ensure_project_instructions(db, employee.design_id).files),
                   'employees': {employee.key: {'version': employee.version, 'profile': employee.profile, 'files': employee.files}}}
     import json

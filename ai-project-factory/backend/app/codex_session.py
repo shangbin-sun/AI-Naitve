@@ -3,10 +3,10 @@ import asyncio
 import json
 import os
 from pathlib import Path
-import signal
 
 from .chat_stream import lean_config, partial_reply
 from .performance import mark, once, add
+from .process_utils import subprocess_group_kwargs, terminate_process
 from .schemas import ChatResponse, DesignResponse
 
 CHAT_INSTRUCTIONS = """你是AI 团队助手，通过中文与用户讨论目标并按要求操作AI 团队。普通聊天直接自然回答，不要求 JSON。
@@ -68,7 +68,8 @@ class CodexConnection:
             self.proc = await asyncio.create_subprocess_exec(
                 self.settings.codex_bin, *model_args, 'app-server', '--listen', 'stdio://',
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL, start_new_session=True, limit=4_000_000,
+                stderr=asyncio.subprocess.DEVNULL, limit=4_000_000,
+                **subprocess_group_kwargs(),
                 env={**os.environ, **self.process_env})
             mark('process_spawned')
             self.reader = asyncio.create_task(self._read())
@@ -157,14 +158,8 @@ class CodexConnection:
             self.loaded.clear()
 
     async def close(self):
-        if self.proc and self.proc.returncode is None:
-            try:
-                os.killpg(self.proc.pid, signal.SIGTERM)
-                await asyncio.wait_for(self.proc.wait(), 3)
-            except (ProcessLookupError, asyncio.TimeoutError):
-                if self.proc.returncode is None:
-                    self.proc.kill()
-                    await self.proc.wait()
+        if self.proc:
+            await terminate_process(self.proc)
         if self.reader:
             self.reader.cancel()
             await asyncio.gather(self.reader, return_exceptions=True)
@@ -179,7 +174,7 @@ class CodexConnection:
         if tool_config:
             config = {**self.config, 'mcp_servers': {**self.config.get('mcp_servers', {}), 'project_factory': tool_config}}
             # Load the small curated skill as stable thread instructions; no filesystem tool is required.
-            instructions += '\n' + SKILL_PATH.read_text()
+            instructions += '\n' + SKILL_PATH.read_text(encoding='utf-8')
         options = {'approvalPolicy': 'never', 'sandbox': 'read-only',
                    'baseInstructions': instructions, 'config': config}
         if workspace:

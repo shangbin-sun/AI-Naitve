@@ -54,7 +54,7 @@ def install_workspace_browser(app, workspaces, runs):
         for child in sorted(directory.iterdir(), key=lambda p:(not p.is_dir(), p.name)):
             if child.is_symlink() or (child.name.startswith('.') and child.name != '.agents'):
                 continue
-            entries.append({'name':child.name, 'path':str(child.relative_to(root)), 'directory':child.is_dir(),
+            entries.append({'name':child.name, 'path':child.relative_to(root).as_posix(), 'directory':child.is_dir(),
                             'size':None if child.is_dir() else child.stat().st_size})
             if len(entries) == 500: break
         return {**details, 'root':str(root), 'path':path, 'entries':entries, 'limit':500}

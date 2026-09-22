@@ -20,7 +20,8 @@ def test_real_python_and_zsh_use_private_temporary_directory(tmp_path):
     if zsh.exists():
         result=subprocess.check_output([str(zsh),'-f','-c','cat <<EOF\nhello\nEOF\nprint -r -- "$TMPPREFIX"'],env={**os.environ,**env},text=True)
         assert result=='hello\n'+env['TMPPREFIX']+'\n'
-    assert Path(env['TMPDIR']).stat().st_mode & 0o777 == 0o700
+    if os.name != 'nt':
+        assert Path(env['TMPDIR']).stat().st_mode & 0o777 == 0o700
 
 
 def test_attempt_isolation_resume_and_symlink_rejection(tmp_path):

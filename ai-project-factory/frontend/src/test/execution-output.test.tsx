@@ -49,3 +49,11 @@ it("员工打开独立工作目录，文件打开仍按任务根目录解析",as
  expect(await screen.findByText("成果")).toBeVisible();
  expect(screen.getAllByRole("link",{name:/VS Code 打开/}).some(link=>link.getAttribute("href")==="vscode://file/run/nodes/analyst/attempts/one/outputs/result.md")).toBe(true);
 });
+
+it("uses Windows paths for VS Code output links", async () => {
+ vi.mocked(api).mockResolvedValue({text:"结果"});
+ render(<ExecutionOutput projectId="p" runId="r" root={String.raw`C:\work\run`} status="completed" files={[{path:"outputs/result.md",description:"结果"}]}/>);
+ expect(screen.getByRole("link",{name:"VS Code 打开"})).toHaveAttribute("href","vscode://file/C:/work/run");
+ await userEvent.click(screen.getByRole("button",{name:/result.md/}));
+ await waitFor(() => expect(document.querySelector('a[href="vscode://file/C:/work/run/outputs/result.md"]')).not.toBeNull());
+});

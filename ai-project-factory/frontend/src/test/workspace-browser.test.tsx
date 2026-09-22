@@ -58,3 +58,16 @@ it("保存AI 团队规则携带读取版本并显示新内容", async () => {
     method: "PUT", body: JSON.stringify({ path: "AGENTS.md", text: "AI 团队独立规则", expected_version: 2 }),
   });
 });
+
+it("uses Windows workspace roots for VS Code links", async () => {
+  vi.mocked(api).mockResolvedValue({
+    root: String.raw`C:\work\run`,
+    label: "AI 团队工作空间",
+    entries: [],
+  });
+  render(<WorkspaceBrowser projectId="p" />);
+  expect(await screen.findByRole("link", { name: "用 VS Code 打开" })).toHaveAttribute(
+    "href",
+    "vscode://file/C:/work/run",
+  );
+});
